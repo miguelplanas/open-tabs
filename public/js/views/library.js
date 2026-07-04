@@ -1,4 +1,4 @@
-import { $app, api, h, escapeHtml } from '../app.js';
+import { $app, api, h, escapeHtml, debounce } from '../app.js';
 
 export async function libraryView() {
   $app.innerHTML = `
@@ -18,9 +18,12 @@ export async function libraryView() {
   const $q = document.getElementById('q');
   const $list = document.getElementById('list');
 
+  let gen = 0;
   async function load() {
+    const my = ++gen;
     try {
       const songs = await api('/songs?q=' + encodeURIComponent($q.value.trim()));
+      if (my !== gen) return; // a newer search superseded this response
       if (songs.length === 0) {
         $list.innerHTML = `<li class="empty">${
           $q.value ? 'No songs match.' : 'Your library is empty.<br>Add a song or search online 🌐'
@@ -38,16 +41,15 @@ export async function libraryView() {
           </a></li>`));
       }
     } catch (err) {
-      if (err.message !== 'unauthorized') {
+      if (my === gen && err.message !== 'unauthorized') {
         $list.innerHTML = `<li class="empty error">${escapeHtml(err.message)}</li>`;
       }
     }
   }
 
-  let t;
-  $q.addEventListener('input', () => {
-    clearTimeout(t);
-    t = setTimeout(load, 200);
-  });
+  const debouncedLoad = debounce(load, 200);
+  $q.addEventListener('input', debouncedLoad);
   await load();
+
+  return () => debouncedLoad.cancel();
 }

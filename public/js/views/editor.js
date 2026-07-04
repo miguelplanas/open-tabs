@@ -1,4 +1,4 @@
-import { $app, api, h, escapeHtml } from '../app.js';
+import { $app, api, escapeHtml } from '../app.js';
 import { renderBody } from '../chords.js';
 
 // Handles #/new (no id), #/edit/:id, and imports handed over from the
@@ -100,8 +100,12 @@ export async function editorView([id]) {
   if ($del) {
     $del.onclick = async () => {
       if (!confirm(`Delete "${song.title}"? This cannot be undone.`)) return;
-      await api('/songs/' + id, { method: 'DELETE' });
-      location.hash = '#/';
+      try {
+        await api('/songs/' + id, { method: 'DELETE' });
+        location.hash = '#/';
+      } catch (err) {
+        alert('Delete failed: ' + err.message);
+      }
     };
   }
 }

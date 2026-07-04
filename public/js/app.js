@@ -27,29 +27,49 @@ export const h = (html) => {
   return t.content.firstElementChild;
 };
 
-export const escapeHtml = (s) =>
-  String(s).replaceAll('&', '&amp;').replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;').replaceAll('"', '&quot;');
+export { escapeHtml } from './chords.js';
+
+// Debounced wrapper with .cancel() so views can clear pending timers in
+// their teardown.
+export function debounce(fn, ms) {
+  let t;
+  const wrapped = (...args) => {
+    clearTimeout(t);
+    t = setTimeout(() => fn(...args), ms);
+  };
+  wrapped.cancel = () => clearTimeout(t);
+  return wrapped;
+}
 
 const routes = [
   { re: /^#?\/?$/, view: libraryView },
   { re: /^#\/song\/(\d+)$/, view: readerView },
   { re: /^#\/edit\/(\d+)$/, view: editorView },
-  { re: /^#\/new$/, view: (params) => editorView(params) },
+  { re: /^#\/new$/, view: editorView },
   { re: /^#\/search$/, view: searchView },
   { re: /^#\/login$/, view: loginView },
 ];
 
 let teardown = null;
+let navSeq = 0;
 
 async function route() {
+  const my = ++navSeq;
   if (typeof teardown === 'function') teardown();
   teardown = null;
   const hash = location.hash || '#/';
   for (const r of routes) {
     const m = hash.match(r.re);
     if (m) {
-      teardown = await r.view(m.slice(1));
+      const td = await r.view(m.slice(1));
+      if (my !== navSeq) {
+        // A newer navigation won while this view was loading: discard it and
+        // repaint the current route in case this one drew over it.
+        if (typeof td === 'function') td();
+        route();
+        return;
+      }
+      teardown = td;
       return;
     }
   }

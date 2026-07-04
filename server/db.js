@@ -1,8 +1,11 @@
 import Database from 'better-sqlite3';
 import { mkdirSync } from 'node:fs';
-import { dirname } from 'node:path';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const DB_PATH = process.env.OPENTABS_DB || 'data/opentabs.db';
+// Resolve paths against the project root so the app works from any CWD.
+export const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const DB_PATH = resolve(ROOT, process.env.OPENTABS_DB || 'data/opentabs.db');
 mkdirSync(dirname(DB_PATH), { recursive: true });
 
 export const db = new Database(DB_PATH);
@@ -25,4 +28,12 @@ db.exec(`
     updated_at TEXT NOT NULL DEFAULT (datetime('now')),
     played_at TEXT
   );
+
+  CREATE TABLE IF NOT EXISTS sessions (
+    token TEXT PRIMARY KEY,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
 `);
+
+// Sessions older than a year are expired; prune on startup.
+db.prepare("DELETE FROM sessions WHERE created_at < datetime('now', '-1 year')").run();

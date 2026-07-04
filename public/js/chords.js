@@ -8,18 +8,16 @@ const SHARP_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#',
 const FLAT_NAMES = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
 
 // A single chord token: root + quality/extensions + optional bass note.
+// 'o' (diminished) and accidental modifiers only count when followed by a
+// digit, so lyric words like "Go", "Do" or "Bob" are not mistaken for chords.
 const CHORD_RE =
-  /^\(?([A-G][#b]?)((?:maj|min|m|M|dim|aug|sus|add|b|#|\d|\+|°|o)*)(?:\/([A-G][#b]?))?\)?\*?$/;
+  /^\(?([A-G][#b]?)((?:maj|min|m|M|dim|aug|sus|add|\+|°|[ob#](?=\d)|\d)*)(?:\/([A-G][#b]?))?\)?\*?$/;
 
 // Tokens allowed on a chord line without being chords themselves.
 const FILLER_RE = /^(\||-|–|x\d+|\(x\d+\)|N\.?C\.?|\.{2,3})$/i;
 
 export function isChordToken(tok) {
-  const m = tok.match(CHORD_RE);
-  if (!m) return false;
-  // Reject bare letter-words that happen to start with A-G ("Am" is a chord,
-  // but "Baby" is not): the quality part must only contain known chord chars.
-  return true;
+  return CHORD_RE.test(tok);
 }
 
 export function isChordLine(line) {
@@ -56,8 +54,10 @@ export function transposeChord(chord, semitones) {
   return out;
 }
 
-const escapeHtml = (s) =>
-  s.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
+// Shared with the rest of the app (re-exported by app.js).
+export const escapeHtml = (s) =>
+  String(s).replaceAll('&', '&amp;').replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;').replaceAll('"', '&quot;');
 
 // Render a plain-text tab body to HTML with chords highlighted and transposed.
 export function renderBody(body, semitones = 0) {

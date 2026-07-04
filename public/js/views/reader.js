@@ -1,4 +1,4 @@
-import { $app, api, h, escapeHtml } from '../app.js';
+import { $app, api, escapeHtml } from '../app.js';
 import { renderBody } from '../chords.js';
 
 export async function readerView([id]) {
@@ -45,19 +45,22 @@ export async function readerView([id]) {
   const $play = document.getElementById('play');
   const $trVal = document.getElementById('tr-val');
 
-  function render() {
+  function applyFontSize() {
     $body.style.fontSize = fontSize + 'px';
+  }
+  function render() {
     $body.innerHTML = renderBody(song.body || '', transpose);
     $trVal.textContent = transpose > 0 ? '+' + transpose : String(transpose);
   }
+  applyFontSize();
   render();
 
   document.getElementById('back').onclick = () => (location.hash = '#/');
   document.getElementById('edit').onclick = () => (location.hash = '#/edit/' + song.id);
   document.getElementById('tr-up').onclick = () => { transpose = Math.min(11, transpose + 1); dirty = true; render(); };
   document.getElementById('tr-down').onclick = () => { transpose = Math.max(-11, transpose - 1); dirty = true; render(); };
-  document.getElementById('fs-up').onclick = () => { fontSize = Math.min(24, fontSize + 1); save(); render(); };
-  document.getElementById('fs-down').onclick = () => { fontSize = Math.max(9, fontSize - 1); save(); render(); };
+  document.getElementById('fs-up').onclick = () => { fontSize = Math.min(24, fontSize + 1); save(); applyFontSize(); };
+  document.getElementById('fs-down').onclick = () => { fontSize = Math.max(9, fontSize - 1); save(); applyFontSize(); };
   document.getElementById('speed').oninput = (e) => { speed = Number(e.target.value); dirty = true; };
   function save() { localStorage.setItem('opentabs.fontSize', String(fontSize)); }
 
@@ -76,7 +79,9 @@ export async function readerView([id]) {
   function step(ts) {
     if (!playing) return;
     if (last) {
-      acc += ((ts - last) / 1000) * speed;
+      // Clamp the frame delta: after backgrounding, ts-last spans the whole
+      // hidden period and would otherwise cause one giant scroll jump.
+      acc += Math.min((ts - last) / 1000, 0.1) * speed;
       if (acc >= 1) {
         const px = Math.floor(acc);
         acc -= px;
@@ -101,23 +106,41 @@ export async function readerView([id]) {
   }
   $play.onclick = () => toggle();
 
-  const onVis = () => {
-    if (document.visibilityState === 'visible' && playing) setWakeLock(true);
-  };
-  document.addEventListener('visibilitychange', onVis);
-
-  // Persist played_at + reader settings; fire-and-forget.
-  api(`/songs/${id}/played`, { method: 'POST', body: {} }).catch(() => {});
-
-  return () => {
-    document.removeEventListener('visibilitychange', onVis);
-    if (raf) cancelAnimationFrame(raf);
-    setWakeLock(false);
-    if (dirty) {
+  // Flush settings even when the PWA is swiped away or the page discarded:
+  // teardown never runs then, but pagehide does, and sendBeacon survives it.
+  function flushSettings() {
+    if (!dirty) return;
+    dirty = false;
+    const url = `/api/songs/${id}/played`;
+    const payload = JSON.stringify({ scroll_speed: speed, transpose });
+    if (navigator.sendBeacon) {
+      navigator.sendBeacon(url, new Blob([payload], { type: 'application/json' }));
+    } else {
       api(`/songs/${id}/played`, {
         method: 'POST',
         body: { scroll_speed: speed, transpose },
       }).catch(() => {});
     }
+  }
+
+  const onVis = () => {
+    if (document.visibilityState === 'visible' && playing) setWakeLock(true);
+    if (document.visibilityState === 'hidden') {
+      last = 0; // don't count hidden time toward autoscroll
+      flushSettings();
+    }
+  };
+  document.addEventListener('visibilitychange', onVis);
+  window.addEventListener('pagehide', flushSettings);
+
+  // Persist played_at; fire-and-forget.
+  api(`/songs/${id}/played`, { method: 'POST', body: {} }).catch(() => {});
+
+  return () => {
+    document.removeEventListener('visibilitychange', onVis);
+    window.removeEventListener('pagehide', flushSettings);
+    if (raf) cancelAnimationFrame(raf);
+    setWakeLock(false);
+    flushSettings();
   };
 }

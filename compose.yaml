@@ -1,0 +1,11 @@
+services:
+  opentabs:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      # Set a strong password before exposing this to the internet.
+      OPENTABS_PASSWORD: ${OPENTABS_PASSWORD:-changeme}
+    volumes:
+      - ./data:/data
+    restart: unless-stopped

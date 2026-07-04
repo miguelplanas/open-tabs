@@ -1,4 +1,4 @@
-import { $app, api, h, escapeHtml } from '../app.js';
+import { $app, api, h, escapeHtml, debounce } from '../app.js';
 
 export async function searchView() {
   $app.innerHTML = `
@@ -32,7 +32,9 @@ export async function searchView() {
     .map((s) => `<option value="${escapeHtml(s.name)}">${escapeHtml(s.label)}</option>`)
     .join('');
 
+  let gen = 0;
   async function search() {
+    const my = ++gen;
     const q = $q.value.trim();
     if (!q) { $results.innerHTML = ''; return; }
     $results.innerHTML = '<li class="spinner">Searching…</li>';
@@ -40,6 +42,7 @@ export async function searchView() {
       const rows = await api(
         `/sources/${$source.value}/search?q=` + encodeURIComponent(q)
       );
+      if (my !== gen) return; // a newer search superseded this response
       if (rows.length === 0) {
         $results.innerHTML = '<li class="empty">No results.</li>';
         return;
@@ -52,13 +55,14 @@ export async function searchView() {
               ${r.type ? `<span class="badge">${escapeHtml(r.type)}</span>` : ''}
             </div>
             <div class="meta">${escapeHtml(r.artist)}
-              ${r.rating ? `<span class="rating">★ ${r.rating}</span> (${r.votes ?? 0})` : ''}
+              ${r.rating ? `<span class="rating">★ ${escapeHtml(r.rating)}</span> (${escapeHtml(r.votes ?? 0)})` : ''}
             </div>
           </a></li>`);
         li.querySelector('a').onclick = () => importTab(r, li);
         $results.append(li);
       }
     } catch (err) {
+      if (my !== gen) return;
       $results.innerHTML = `<li class="empty error">${escapeHtml(err.message)}</li>`;
     }
   }
@@ -79,13 +83,12 @@ export async function searchView() {
     }
   }
 
-  let t;
-  $q.addEventListener('input', () => {
-    clearTimeout(t);
-    t = setTimeout(search, 500);
-  });
+  const debouncedSearch = debounce(search, 500);
+  $q.addEventListener('input', debouncedSearch);
   $q.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') { clearTimeout(t); search(); }
+    if (e.key === 'Enter') { debouncedSearch.cancel(); search(); }
   });
   $q.focus();
+
+  return () => debouncedSearch.cancel();
 }

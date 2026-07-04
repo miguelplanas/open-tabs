@@ -1,7 +1,12 @@
-// OpenTabs service worker: cache-first for the app shell, network-first with
-// cache fallback for the songs API so the library stays readable offline.
-const SHELL_CACHE = 'opentabs-shell-v1';
-const API_CACHE = 'opentabs-api-v1';
+// OpenTabs service worker.
+// App shell: stale-while-revalidate, so installed PWAs serve instantly from
+// cache but pick up deployed changes on the next load without anyone having
+// to remember to bump a version string.
+// Songs API: network-first with cache fallback so the library stays readable
+// offline. Only canonical URLs (/api/songs and /api/songs/:id) are cached to
+// keep the cache bounded; per-keystroke ?q= searches are not stored.
+const SHELL_CACHE = 'opentabs-shell-v2';
+const API_CACHE = 'opentabs-api-v2';
 const SHELL = [
   '/', '/index.html', '/css/app.css', '/manifest.webmanifest',
   '/js/app.js', '/js/chords.js',
@@ -28,16 +33,20 @@ self.addEventListener('activate', (e) => {
   );
 });
 
+const cacheableApi = (url) =>
+  (url.pathname === '/api/songs' && !url.search) ||
+  /^\/api\/songs\/\d+$/.test(url.pathname);
+
 self.addEventListener('fetch', (e) => {
   const url = new URL(e.request.url);
   if (e.request.method !== 'GET' || url.origin !== location.origin) return;
 
-  // Songs API: network first, fall back to last cached copy when offline.
-  if (url.pathname.startsWith('/api/songs')) {
+  if (url.pathname.startsWith('/api/')) {
+    if (!url.pathname.startsWith('/api/songs')) return; // auth, sources: network only
     e.respondWith(
       fetch(e.request)
         .then((res) => {
-          if (res.ok) {
+          if (res.ok && cacheableApi(url)) {
             const copy = res.clone();
             caches.open(API_CACHE).then((c) => c.put(e.request, copy));
           }
@@ -47,10 +56,18 @@ self.addEventListener('fetch', (e) => {
     );
     return;
   }
-  if (url.pathname.startsWith('/api/')) return; // auth, sources: network only
 
-  // Static shell: cache first.
+  // Static shell: serve from cache, refresh the cache in the background.
   e.respondWith(
-    caches.match(e.request).then((hit) => hit || fetch(e.request))
+    caches.open(SHELL_CACHE).then(async (cache) => {
+      const cached = await cache.match(e.request);
+      const refresh = fetch(e.request)
+        .then((res) => {
+          if (res.ok) cache.put(e.request, res.clone());
+          return res;
+        })
+        .catch(() => cached);
+      return cached || refresh;
+    })
   );
 });

@@ -17,12 +17,13 @@ const UA =
 const ALLOWED_HOSTS = new Set(['www.ultimate-guitar.com', 'tabs.ultimate-guitar.com']);
 
 function decodeEntities(s) {
+  // &amp; must be decoded last or nested entities double-decode.
   return s
     .replaceAll('&quot;', '"')
     .replaceAll('&#039;', "'")
-    .replaceAll('&amp;', '&')
     .replaceAll('&lt;', '<')
-    .replaceAll('&gt;', '>');
+    .replaceAll('&gt;', '>')
+    .replaceAll('&amp;', '&');
 }
 
 // UG sits behind Cloudflare, which rejects Node's TLS fingerprint but accepts
@@ -53,7 +54,9 @@ async function curlGet(u) {
 
 async function fetchStore(url) {
   const u = new URL(url);
-  if (!ALLOWED_HOSTS.has(u.hostname)) throw new Error('not an ultimate-guitar.com URL');
+  if (u.protocol !== 'https:' || !ALLOWED_HOSTS.has(u.hostname)) {
+    throw new Error('not an https ultimate-guitar.com URL');
+  }
   const { status, body: html } = await curlGet(u);
   if (status < 200 || status >= 300) {
     throw new Error(`HTTP ${status} from ultimate-guitar.com`);

@@ -11,10 +11,12 @@ const FLAT_NAMES = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 
 // 'o' (diminished) and accidental modifiers only count when followed by a
 // digit, so lyric words like "Go", "Do" or "Bob" are not mistaken for chords.
 const CHORD_RE =
-  /^\(?([A-G][#b]?)((?:maj|min|m|M|dim|aug|sus|add|\+|°|[ob#](?=\d)|\d)*)(?:\/([A-G][#b]?))?\)?\*?$/;
+  /^\(?([A-G][#b]?)((?:maj|min|m|M|dim|aug|sus|add|\+|°|[ob#](?=\d)|\d)*)(?:\/([A-G][#b]?))?\)?\**$/;
 
 // Tokens allowed on a chord line without being chords themselves.
-const FILLER_RE = /^(\||-|–|x\d+|\(x\d+\)|N\.?C\.?|\.{2,3})$/i;
+// Asterisks are footnote markers ("Am *", "Cmaj7 **"): kept in the output
+// but they must not stop the line from being detected as a chord line.
+const FILLER_RE = /^(\||-|–|x\d+|\(x\d+\)|N\.?C\.?|\.{2,3}|\*+)$/i;
 
 export function isChordToken(tok) {
   return CHORD_RE.test(tok);

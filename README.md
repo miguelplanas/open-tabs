@@ -6,7 +6,7 @@ anywhere. Built as a personal alternative to Ultimate Guitar.
 
 ## Features
 
-- **Library** with instant search (title, artist, tags), sorted by recently played.
+- **Library** with instant search (title, artist), sorted by recently played.
 - **Reader** optimized for phones: chord highlighting, autoscroll with per-song
   speed, transpose (persisted per song), capo/tuning display, font size control,
   screen wake lock so the phone doesn't sleep mid-song.
@@ -19,6 +19,59 @@ anywhere. Built as a personal alternative to Ultimate Guitar.
   cached songs.
 - **Single container**: Node + SQLite, trivial to migrate between hosts (copy
   `data/opentabs.db`).
+
+## Data model
+
+Everything lives in a single SQLite file (`data/opentabs.db`). Four tables:
+`songs`, `collections`, the `collection_songs` join table (ordered
+many-to-many), and `sessions` for auth. The `foreign_keys` pragma is ON, so
+deleting a song or a collection cascades to its membership rows.
+
+```mermaid
+erDiagram
+    songs ||--o{ collection_songs : "appears in"
+    collections ||--o{ collection_songs : "contains"
+
+    songs {
+        INTEGER id PK "AUTOINCREMENT"
+        TEXT title "NOT NULL"
+        TEXT artist "default ''"
+        TEXT body "monospace tab/chords, default ''"
+        INTEGER capo "default 0"
+        TEXT tuning "default ''"
+        REAL scroll_speed "default 20"
+        INTEGER transpose "semitones, default 0"
+        TEXT source "provider id, default ''"
+        TEXT source_url "default ''"
+        TEXT created_at "default now"
+        TEXT updated_at "default now"
+        TEXT played_at "nullable"
+    }
+
+    collections {
+        INTEGER id PK "AUTOINCREMENT"
+        TEXT name "NOT NULL"
+        TEXT description "default ''"
+        TEXT color "default ''"
+        TEXT created_at "default now"
+        TEXT updated_at "default now"
+    }
+
+    collection_songs {
+        INTEGER collection_id PK,FK "-> collections.id, ON DELETE CASCADE"
+        INTEGER song_id PK,FK "-> songs.id, ON DELETE CASCADE"
+        INTEGER position "explicit order, default 0"
+        TEXT added_at "default now"
+    }
+
+    sessions {
+        TEXT token PK "HMAC session cookie"
+        TEXT created_at "default now, pruned after 1 year"
+    }
+```
+
+`sessions` stands alone (no foreign keys): it just records valid auth cookies
+and is unused when `OPENTABS_PASSWORD` is not set.
 
 ## Run locally
 

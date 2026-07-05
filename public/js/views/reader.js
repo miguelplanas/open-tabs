@@ -1,5 +1,6 @@
 import { $app, api, escapeHtml } from '../app.js';
 import { renderBody } from '../chords.js';
+import { addToCollectionDialog } from '../ui.js';
 
 export async function readerView([id]) {
   let song;
@@ -10,6 +11,14 @@ export async function readerView([id]) {
     $app.innerHTML = `<div class="empty error">${escapeHtml(err.message)}</div>`;
     return;
   }
+
+  // Setlist context, if this song was opened from a collection ("play through"
+  // or a row tap): enables prev/next navigation and a back-to-collection.
+  let setlist = null;
+  try { setlist = JSON.parse(sessionStorage.getItem('opentabs.setlist')); } catch { /* ignore */ }
+  const setIdx = setlist && Array.isArray(setlist.ids) ? setlist.ids.indexOf(Number(id)) : -1;
+  const inSetlist = setIdx >= 0;
+  const backHash = inSetlist ? '#/collection/' + setlist.id : '#/';
 
   let transpose = song.transpose || 0;
   let speed = song.scroll_speed || 20; // pixels per second
@@ -27,11 +36,27 @@ export async function readerView([id]) {
           song.capo ? ` · capo ${song.capo}` : ''}${
           song.tuning && song.tuning.toLowerCase() !== 'standard' ? ` · ${escapeHtml(song.tuning)}` : ''}</span>
       </h1>
+      <button class="btn icon" id="add-col" title="Add to collection">📁</button>
       <button class="btn icon" id="edit" title="Edit">✏️</button>
     </header>
+    ${inSetlist ? `
+    <div class="setlist-bar">
+      <button class="btn icon" id="prev" title="Previous" ${setIdx === 0 ? 'disabled' : ''}>‹</button>
+      <span class="setlist-info">${escapeHtml(setlist.name)} <span class="count">${setIdx + 1}/${setlist.ids.length}</span></span>
+      <button class="btn icon" id="next" title="Next" ${setIdx === setlist.ids.length - 1 ? 'disabled' : ''}>›</button>
+    </div>` : ''}
+    <div class="fret-rail" aria-hidden="true">
+      <span class="fd" style="top:25%"></span>
+      <span class="fd" style="top:41.7%"></span>
+      <span class="fd" style="top:58.3%"></span>
+      <span class="fd" style="top:75%"></span>
+      <span class="fd fd-oct" style="top:100%"></span>
+      <span class="fret-here" id="progress"></span>
+    </div>
     <pre class="tabbody" id="body"></pre>
+    <div class="songend strings"></div>
     <div class="reader-controls">
-      <button class="btn primary icon" id="play" title="Autoscroll">▶</button>
+      <button class="btn primary icon play" id="play" title="Autoscroll">▶</button>
       <input type="range" id="speed" min="4" max="120" step="1" value="${speed}" title="Scroll speed">
       <div class="pill" title="Transpose">
         <button id="tr-down">♭</button><span id="tr-val"></span><button id="tr-up">♯</button>
@@ -44,6 +69,14 @@ export async function readerView([id]) {
   const $body = document.getElementById('body');
   const $play = document.getElementById('play');
   const $trVal = document.getElementById('tr-val');
+  const $progress = document.getElementById('progress');
+
+  function updateProgress() {
+    const max = document.body.scrollHeight - window.innerHeight;
+    $progress.style.top = (max > 0 ? (100 * window.scrollY) / max : 0) + '%';
+  }
+  window.addEventListener('scroll', updateProgress, { passive: true });
+  updateProgress();
 
   function applyFontSize() {
     $body.style.fontSize = fontSize + 'px';
@@ -55,8 +88,14 @@ export async function readerView([id]) {
   applyFontSize();
   render();
 
-  document.getElementById('back').onclick = () => (location.hash = '#/');
+  document.getElementById('back').onclick = () => (location.hash = backHash);
   document.getElementById('edit').onclick = () => (location.hash = '#/edit/' + song.id);
+  document.getElementById('add-col').onclick = () => addToCollectionDialog(song);
+  if (inSetlist) {
+    const goTo = (i) => { if (i >= 0 && i < setlist.ids.length) location.hash = '#/song/' + setlist.ids[i]; };
+    document.getElementById('prev').onclick = () => goTo(setIdx - 1);
+    document.getElementById('next').onclick = () => goTo(setIdx + 1);
+  }
   document.getElementById('tr-up').onclick = () => { transpose = Math.min(11, transpose + 1); dirty = true; render(); };
   document.getElementById('tr-down').onclick = () => { transpose = Math.max(-11, transpose - 1); dirty = true; render(); };
   document.getElementById('fs-up').onclick = () => { fontSize = Math.min(24, fontSize + 1); save(); applyFontSize(); };
@@ -99,12 +138,23 @@ export async function readerView([id]) {
   function toggle(on = !playing) {
     playing = on;
     $play.textContent = playing ? '⏸' : '▶';
+    $play.classList.toggle('playing', playing);
     last = 0; acc = 0;
     if (playing) raf = requestAnimationFrame(step);
     else if (raf) cancelAnimationFrame(raf);
     setWakeLock(playing);
   }
   $play.onclick = () => toggle();
+
+  // Space toggles autoscroll (handy on the laptop); ignore it while typing.
+  function onKey(e) {
+    if (e.key !== ' ' && e.code !== 'Space') return;
+    const t = e.target;
+    if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+    e.preventDefault();
+    toggle();
+  }
+  document.addEventListener('keydown', onKey);
 
   // Flush settings even when the PWA is swiped away or the page discarded:
   // teardown never runs then, but pagehide does, and sendBeacon survives it.
@@ -137,6 +187,8 @@ export async function readerView([id]) {
   api(`/songs/${id}/played`, { method: 'POST', body: {} }).catch(() => {});
 
   return () => {
+    window.removeEventListener('scroll', updateProgress);
+    document.removeEventListener('keydown', onKey);
     document.removeEventListener('visibilitychange', onVis);
     window.removeEventListener('pagehide', flushSettings);
     if (raf) cancelAnimationFrame(raf);

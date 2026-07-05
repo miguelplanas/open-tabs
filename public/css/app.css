@@ -1,95 +1,314 @@
+/* OpenTabs "Folio": a personal songbook you can read on a music stand.
+   Paper-first by day (serif table of contents on warm paper), a stage-dark
+   reader by night. One earned accent, a hymnal-cloth pine, carries every
+   interactive state. Monospace is reserved for exactly one thing: the tab
+   body, where alignment is meaning. Two signature motifs: the six-string
+   divider (.strings) and the fret-inlay scroll rail (.fret-rail). */
+
 :root {
-  --bg: #16181d;
-  --bg2: #1f232b;
-  --bg3: #2a2f3a;
-  --fg: #e8eaf0;
-  --muted: #9aa3b2;
-  --accent: #ffb454;
-  --chord: #6cb6ff;
-  --danger: #ff6b6b;
+  --serif: ui-serif, "New York", "Iowan Old Style", Georgia, "Times New Roman", serif;
+  --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, system-ui, sans-serif;
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+
+  /* Light = paper */
+  --bg: #f6f1e7;
+  --bg2: #fdfaf2;
+  --bg3: #eee7d8;
+  --bg4: #e3dac7;
+  --border: rgba(45, 38, 26, 0.14);
+  --hair: rgba(45, 38, 26, 0.13);
+  --fg: #24262b;
+  --muted: #6c6558;
+  --muted-2: #938b79;
+  --accent: #2f6e5b;
+  --accent-soft: rgba(47, 110, 91, 0.12);
+  --accent-ink: #fbfbf6;
+  --chord: #1f5fb0;
+  --tabline: #6a6353;
+  --mark: rgba(224, 167, 45, 0.3);
+  --danger: #b23a2e;
+  --danger-ink: #fff4f1;
+  --scrim: rgba(45, 38, 26, 0.34);
+  --glass: rgba(246, 241, 231, 0.86);
+  --string: rgba(45, 38, 26, 0.5);
+  --radius: 12px;
+  --radius-lg: 16px;
+  --shadow: 0 1px 0 rgba(255, 255, 255, 0.6) inset, 0 10px 24px -18px rgba(70, 55, 25, 0.4);
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
 }
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    /* Dark = stage */
+    --bg: #15171a;
+    --bg2: #1c1f22;
+    --bg3: #23272b;
+    --bg4: #2c3136;
+    --border: rgba(236, 231, 219, 0.12);
+    --hair: rgba(236, 231, 219, 0.11);
+    --fg: #ece7db;
+    --muted: #9b968a;
+    --muted-2: #746f64;
+    --accent: #74b9a1;
+    --accent-soft: rgba(116, 185, 161, 0.16);
+    --accent-ink: #0f201b;
+    --chord: #86b7ee;
+    --tabline: #b7b0a2;
+    --mark: rgba(224, 167, 45, 0.18);
+    --danger: #e9776b;
+    --danger-ink: #2a0e0b;
+    --scrim: rgba(0, 0, 0, 0.55);
+    --glass: rgba(21, 23, 26, 0.86);
+    --string: rgba(236, 231, 219, 0.5);
+    --shadow: 0 1px 0 rgba(255, 255, 255, 0.03) inset, 0 10px 24px -18px rgba(0, 0, 0, 0.7);
+  }
+}
+
 * { box-sizing: border-box; }
 html, body { margin: 0; padding: 0; background: var(--bg); color: var(--fg); }
 body {
-  font: 16px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font: 16px/1.5 var(--sans);
   -webkit-text-size-adjust: 100%;
 }
 a { color: var(--accent); text-decoration: none; }
 button, input, select, textarea { font: inherit; color: inherit; }
+button, .chip, .btn { transition: background-color 0.15s ease, transform 0.1s ease, border-color 0.15s ease, box-shadow 0.15s ease; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+code { font-family: var(--mono); font-size: 0.9em; }
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; animation: none !important; }
+}
+
+/* Six-string divider: E A D G B e, thickest at the bottom. */
+.strings {
+  height: 18px;
+  background:
+    linear-gradient(var(--string), var(--string)) 0 1px / 100% 1px,
+    linear-gradient(var(--string), var(--string)) 0 4px / 100% 1px,
+    linear-gradient(var(--string), var(--string)) 0 7px / 100% 1px,
+    linear-gradient(var(--string), var(--string)) 0 10.5px / 100% 1.5px,
+    linear-gradient(var(--string), var(--string)) 0 14px / 100% 2px,
+    linear-gradient(var(--string), var(--string)) 0 17px / 100% 2px;
+  background-repeat: no-repeat;
+  opacity: 0.5;
+}
 
 .topbar {
   position: sticky; top: 0; z-index: 10;
   display: flex; align-items: center; gap: 10px;
-  padding: calc(8px + var(--safe-top)) 14px 8px;
-  background: rgba(22, 24, 29, 0.92);
-  backdrop-filter: blur(8px);
-  border-bottom: 1px solid var(--bg3);
+  padding: calc(10px + var(--safe-top)) 14px 10px;
+  background: var(--glass);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--border);
 }
-.topbar h1 { font-size: 18px; margin: 0; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.topbar .sub { color: var(--muted); font-size: 13px; }
+.topbar h1 {
+  font-family: var(--serif);
+  font-size: 20px; font-weight: 600; letter-spacing: -0.01em;
+  margin: 0; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.topbar .sub {
+  display: block;
+  font-family: var(--sans);
+  color: var(--muted); font-size: 12.5px; font-weight: 400; letter-spacing: 0;
+}
 
 .btn {
-  background: var(--bg3); border: none; border-radius: 10px;
+  background: var(--bg3); border: 1px solid var(--border); border-radius: 10px;
   padding: 8px 14px; cursor: pointer; color: var(--fg);
   min-height: 40px;
 }
+.btn:hover { background: var(--bg4); }
 .btn:active { transform: scale(0.97); }
-.btn.primary { background: var(--accent); color: #1a1200; font-weight: 600; }
-.btn.danger { background: transparent; color: var(--danger); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
+.btn.primary:hover { filter: brightness(1.05); background: var(--accent); }
+.btn.danger { background: transparent; border-color: transparent; color: var(--danger); }
+.btn.danger:hover { background: var(--bg3); }
+.btn.danger-solid { background: var(--danger); border-color: var(--danger); color: var(--danger-ink); font-weight: 600; }
 .btn.icon { padding: 8px 10px; font-size: 18px; line-height: 1; }
 
 .content { padding: 14px; max-width: 900px; margin: 0 auto; }
 
 .searchbox {
-  width: 100%; padding: 12px 14px; border-radius: 12px;
-  background: var(--bg2); border: 1px solid var(--bg3);
+  width: 100%; padding: 12px 14px; border-radius: var(--radius);
+  background: var(--bg2); border: 1px solid var(--border);
   margin-bottom: 12px; outline: none;
 }
-.searchbox:focus { border-color: var(--accent); }
+.searchbox:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.searchbox::placeholder { color: var(--muted-2); }
 
+.toolbar { display: flex; gap: 8px; margin-bottom: 10px; }
+.toolbar .btn { padding: 7px 12px; font-size: 13px; min-height: 34px; }
+.toolbar .btn.active, .btn.active { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
+
+.chips { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+.chip {
+  background: var(--bg2); border: 1px solid var(--border); color: var(--muted);
+  border-radius: 999px; padding: 5px 12px; font-size: 12.5px; cursor: pointer;
+}
+.chip:hover { background: var(--bg3); }
+.chip.active { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
+
+/* Song list as a table of contents: hairline rules, serif titles, no cards. */
 .songlist { list-style: none; margin: 0; padding: 0; }
 .songlist li a {
-  display: block; padding: 13px 14px; border-radius: 12px;
-  background: var(--bg2); margin-bottom: 8px; color: var(--fg);
+  display: block; padding: 12px 6px;
+  border-bottom: 1px solid var(--hair);
+  color: var(--fg);
 }
+.songlist li a:hover { background: var(--bg3); }
 .songlist li a:active { background: var(--bg3); }
-.songlist .title { font-weight: 600; }
-.songlist .meta { color: var(--muted); font-size: 13px; margin-top: 2px; }
-.badge {
-  display: inline-block; font-size: 11px; padding: 1px 7px;
-  border-radius: 8px; background: var(--bg3); color: var(--muted);
-  margin-left: 6px; vertical-align: 1px;
+.songlist .title {
+  font-family: var(--serif); font-weight: 600; font-size: 17.5px; line-height: 1.2;
+  letter-spacing: -0.005em;
 }
-.empty { color: var(--muted); text-align: center; padding: 48px 20px; }
+.songlist .meta { font-family: var(--sans); color: var(--muted); font-size: 13px; margin-top: 2px; }
+.songlist .group-header {
+  font-family: var(--serif);
+  color: var(--accent); font-size: 15px; font-weight: 600; letter-spacing: -0.005em;
+  padding: 18px 6px 6px; margin-bottom: 2px;
+  border-bottom: 1px solid var(--hair);
+}
+.songlist .group-header:first-child { padding-top: 4px; }
+.badge {
+  display: inline-block; font-family: var(--mono); font-size: 10.5px;
+  padding: 2px 7px; border-radius: 6px;
+  background: var(--accent-soft); border: 1px solid transparent; color: var(--accent);
+  margin-left: 6px; vertical-align: 2px; font-weight: 600;
+}
+.count { color: var(--muted-2); font-weight: 400; font-family: var(--sans); font-size: 0.86em; }
+.empty { color: var(--muted); text-align: center; padding: 44px 20px; line-height: 1.6; }
+.empty .strings { max-width: 200px; margin: 0 auto 22px; }
+.error { color: var(--danger); }
+.spinner { color: var(--muted); text-align: center; padding: 30px; }
+
+/* Songs / Collections segmented switcher */
+.segments {
+  display: flex; gap: 4px; padding: 4px;
+  background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius);
+  margin-bottom: 14px;
+}
+.segment {
+  flex: 1; background: none; border: none; border-radius: 9px; cursor: pointer;
+  font-family: var(--sans); font-size: 13.5px; font-weight: 600;
+  color: var(--muted); padding: 8px 10px;
+}
+.segment:hover { color: var(--fg); }
+.segment.active { background: var(--accent); color: var(--accent-ink); }
+
+/* Collections */
+.col-desc { color: var(--muted); font-size: 14px; margin: 0 0 12px; line-height: 1.5; }
+.col-song { display: flex; align-items: stretch; gap: 8px; border-bottom: 1px solid var(--hair); }
+.songlist .col-song .col-song-main { flex: 1; min-width: 0; border-bottom: none; }
+.col-song.editing .col-song-main { pointer-events: none; }
+.row-ctrl { display: flex; align-items: center; gap: 4px; }
+.row-ctrl .reorder {
+  min-height: 40px; min-width: 40px; padding: 6px 10px; font-size: 15px;
+  display: flex; align-items: center; justify-content: center;
+}
+.row-ctrl .reorder:disabled { opacity: 0.35; cursor: default; }
+
+/* Delete collection: a quiet destructive action set off by a hairline, it stays
+   muted until you reach for it. */
+.col-danger {
+  margin-top: 26px; padding-top: 14px;
+  border-top: 1px solid var(--hair);
+  display: flex; justify-content: center;
+}
+.col-danger .btn-quiet {
+  background: none; border: none; cursor: pointer;
+  font-family: var(--sans); font-size: 13px; color: var(--muted-2);
+  padding: 8px 12px; border-radius: 8px; min-height: 40px;
+}
+.col-danger .btn-quiet:hover { color: var(--danger); background: var(--bg3); }
+.col-danger .btn-quiet:focus-visible { color: var(--danger); }
+
+/* Setlist strip under the reader topbar (scrolls with content; the sticky
+   topbar cleanly covers it as you scroll into the song). */
+.setlist-bar {
+  display: flex; align-items: center; gap: 10px;
+  padding: 6px 14px;
+  background: var(--bg3); border-bottom: 1px solid var(--border);
+}
+.setlist-info {
+  flex: 1; text-align: center; font-size: 13px; color: var(--muted);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.setlist-bar .btn.icon { min-width: 40px; font-size: 22px; line-height: 1; }
+.setlist-bar .btn.icon:disabled { opacity: 0.3; cursor: default; }
 
 /* Reader */
 .tabbody {
-  font: 14px/1.45 ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font: 14px/1.45 var(--mono);
   white-space: pre; overflow-x: auto;
-  padding: 14px 14px calc(50vh + var(--safe-bottom));
+  margin: 0;
+  padding: 14px 14px 20px;
 }
 .tabbody .chord { color: var(--chord); font-weight: 700; }
-.tabbody .section { color: var(--accent); font-weight: 700; }
-.tabbody .tabline { color: #b9c2d0; }
+.tabbody .section {
+  font-family: var(--serif); font-style: italic; font-size: 1.15em; font-weight: 600;
+  color: var(--accent);
+}
+.tabbody .tabline { color: var(--tabline); }
+
+/* End-of-song marker + runway so the last lines can scroll to the top. */
+.songend {
+  margin: 14px auto 0;
+  max-width: 220px;
+  /* Runway so the last lines can scroll up; padding (not margin) so it
+     counts toward scrollHeight and autoscroll's end detection. */
+  padding-bottom: calc(60vh + var(--safe-bottom));
+}
+
+/* Fret-inlay scroll rail: fixed dots mark the neck (frets 3-5-7-9 and a hollow
+   octave at 12); the pine dot is "you are here". */
+.fret-rail {
+  position: fixed; z-index: 15;
+  top: calc(60px + var(--safe-top));
+  bottom: calc(78px + var(--safe-bottom));
+  right: 7px; width: 12px;
+  pointer-events: none;
+}
+.fret-rail .fd {
+  position: absolute; left: 50%; width: 5px; height: 5px;
+  margin-left: -2.5px; margin-top: -2.5px;
+  border-radius: 999px; background: var(--muted-2); opacity: 0.5;
+}
+.fret-rail .fd-oct {
+  width: 7px; height: 7px; margin-left: -3.5px; margin-top: -3.5px;
+  background: transparent; border: 1px solid var(--muted-2); opacity: 0.6;
+}
+.fret-here {
+  position: absolute; left: 50%; top: 0; width: 9px; height: 9px;
+  margin-left: -4.5px; margin-top: -4.5px;
+  border-radius: 999px; background: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+  transition: top 0.1s linear;
+}
 
 .reader-controls {
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 20;
   display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
   padding: 10px 14px calc(10px + var(--safe-bottom));
-  background: rgba(22, 24, 29, 0.95);
-  backdrop-filter: blur(8px);
-  border-top: 1px solid var(--bg3);
+  background: var(--glass);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-top: 1px solid var(--border);
 }
 .reader-controls .grow { flex: 1; }
 .reader-controls input[type=range] { flex: 1; min-width: 90px; accent-color: var(--accent); }
+.reader-controls .btn.play { border-radius: 999px; min-width: 44px; }
+.reader-controls .btn.play.playing {
+  box-shadow: 0 0 0 4px var(--accent-soft), 0 0 18px -2px var(--accent);
+}
 .pill {
   display: flex; align-items: center; gap: 2px;
-  background: var(--bg3); border-radius: 10px; overflow: hidden;
+  background: var(--bg3); border: 1px solid var(--border); border-radius: 10px; overflow: hidden;
 }
 .pill button { background: none; border: none; padding: 8px 12px; cursor: pointer; min-height: 40px; }
-.pill span { font-size: 13px; color: var(--muted); min-width: 34px; text-align: center; }
+.pill span { font-family: var(--mono); font-size: 13px; color: var(--muted); min-width: 34px; text-align: center; }
 
 /* Editor */
 .editor form { display: flex; flex-direction: column; gap: 10px; }
@@ -97,11 +316,11 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .editor .row > * { flex: 1; min-width: 0; }
 .editor input, .editor textarea {
   width: 100%; padding: 11px 12px; border-radius: 10px;
-  background: var(--bg2); border: 1px solid var(--bg3); outline: none;
+  background: var(--bg2); border: 1px solid var(--border); outline: none;
 }
-.editor input:focus, .editor textarea:focus { border-color: var(--accent); }
+.editor input:focus, .editor textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
 .editor textarea {
-  font: 13px/1.45 ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font: 13px/1.45 var(--mono);
   min-height: 55vh; white-space: pre; resize: vertical;
 }
 .editor .actions { display: flex; gap: 10px; justify-content: space-between; }
@@ -111,10 +330,104 @@ label.f > * { margin-top: 4px; }
 /* Search online */
 .result-actions { display: flex; gap: 8px; margin-top: 6px; }
 .rating { color: var(--accent); }
-.notice { background: var(--bg2); border-radius: 12px; padding: 12px 14px; color: var(--muted); font-size: 14px; margin-bottom: 12px; }
+
+/* Grouped result: the row is the song; expanding it lists the versions
+   as indented hairline sub-rows, table-of-contents style. */
+.result.open > a { border-bottom-color: transparent; }
+.versions {
+  list-style: none; margin: 0; padding: 0 0 6px 20px;
+  border-bottom: 1px solid var(--hair);
+}
+.versions button {
+  display: flex; width: 100%; align-items: center; gap: 10px;
+  padding: 9px 6px; background: none; border: none;
+  border-top: 1px solid var(--hair);
+  cursor: pointer; text-align: left; font-size: 14px;
+}
+.versions li:first-child button { border-top: none; }
+.versions button:hover { background: var(--bg3); }
+.versions .ver { font-family: var(--mono); font-size: 12.5px; color: var(--muted); min-width: 46px; }
+.versions .vtype { margin-left: 0; }
+.versions .vrating { margin-left: auto; font-size: 13px; color: var(--muted); white-space: nowrap; }
+.notice {
+  background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 12px 14px; color: var(--muted); font-size: 14px; margin-bottom: 12px;
+}
 
 /* Login */
-.login { max-width: 340px; margin: 18vh auto 0; display: flex; flex-direction: column; gap: 12px; padding: 0 20px; text-align: center; }
-.login input { padding: 12px 14px; border-radius: 12px; background: var(--bg2); border: 1px solid var(--bg3); outline: none; text-align: center; }
-.error { color: var(--danger); font-size: 14px; }
-.spinner { color: var(--muted); text-align: center; padding: 30px; }
+.login { max-width: 340px; margin: 16vh auto 0; display: flex; flex-direction: column; gap: 12px; padding: 0 20px; text-align: center; }
+.login .strings { max-width: 220px; width: 100%; margin: 0 auto 6px; }
+.login h1 {
+  font-family: var(--serif);
+  font-weight: 600; font-size: 30px; letter-spacing: -0.01em; margin: 0 0 10px;
+}
+.login input {
+  padding: 12px 14px; border-radius: var(--radius);
+  background: var(--bg2); border: 1px solid var(--border); outline: none; text-align: center;
+}
+.login input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+
+/* Toasts */
+.toast-stack {
+  position: fixed; left: 0; right: 0; bottom: calc(16px + var(--safe-bottom));
+  z-index: 100; display: flex; flex-direction: column; align-items: center; gap: 8px;
+  padding: 0 14px; pointer-events: none;
+}
+.toast {
+  max-width: 480px; width: 100%;
+  background: var(--bg4); border: 1px solid var(--border); box-shadow: var(--shadow);
+  color: var(--fg); border-radius: var(--radius); padding: 12px 16px; font-size: 14px;
+  opacity: 0; transform: translateY(8px); transition: opacity 0.2s ease, transform 0.2s ease;
+}
+.toast.show { opacity: 1; transform: translateY(0); }
+.toast.danger { border-color: rgba(178, 58, 46, 0.4); color: var(--danger); }
+
+/* Confirm / prompt / picker dialogs */
+.confirm-overlay {
+  position: fixed; inset: 0; z-index: 200;
+  display: flex; align-items: flex-end; justify-content: center;
+  background: rgba(0, 0, 0, 0); pointer-events: none;
+  transition: background-color 0.2s ease;
+}
+.confirm-overlay.show { background: var(--scrim); pointer-events: auto; }
+.confirm-box {
+  width: 100%; max-width: 420px; margin: 0 14px calc(14px + var(--safe-bottom));
+  background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius-lg);
+  box-shadow: var(--shadow); padding: 20px;
+  transform: translateY(16px); opacity: 0;
+  transition: transform 0.2s ease, opacity 0.2s ease;
+}
+.confirm-overlay.show .confirm-box { transform: translateY(0); opacity: 1; }
+.confirm-box p { margin: 0 0 16px; line-height: 1.5; }
+.confirm-actions { display: flex; gap: 10px; justify-content: flex-end; }
+@media (min-width: 520px) {
+  .confirm-overlay { align-items: center; }
+  .confirm-box { margin: 0; }
+}
+
+.confirm-box.picker { display: flex; flex-direction: column; max-height: 72vh; padding: 18px; }
+.prompt-input {
+  width: 100%; padding: 11px 12px; border-radius: 10px; margin-bottom: 12px;
+  background: var(--bg2); border: 1px solid var(--border); outline: none;
+}
+.prompt-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.picker-list {
+  list-style: none; margin: 0 0 12px; padding: 0;
+  flex: 1; overflow-y: auto; min-height: 60px;
+}
+.picker-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 11px 12px; border-radius: 10px; cursor: pointer;
+  border: 1px solid var(--border); background: var(--bg); margin-bottom: 6px;
+}
+.picker-row:hover { background: var(--bg3); }
+.picker-row.member { border-color: rgba(47, 110, 91, 0.4); }
+.picker-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.picker-check {
+  flex: none; width: 26px; height: 26px; border-radius: 999px;
+  display: flex; align-items: center; justify-content: center; font-weight: 700;
+  background: var(--bg4); color: var(--muted);
+}
+.picker-row.member .picker-check { background: var(--accent); color: var(--accent-ink); }
+.picker-empty { color: var(--muted); text-align: center; padding: 20px; }
+.picker-new { width: 100%; margin-bottom: 12px; }

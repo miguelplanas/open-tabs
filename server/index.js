@@ -5,6 +5,7 @@ import { join, relative } from 'node:path';
 import { ROOT } from './db.js';
 import { auth, apiAuth, authEnabled } from './auth.js';
 import { songs } from './songs.js';
+import { collections } from './collections.js';
 import { sources } from './sources/index.js';
 
 const app = new Hono();
@@ -14,6 +15,7 @@ const app = new Hono();
 app.use('/api/*', apiAuth);
 app.route('/api', auth);
 app.route('/api/songs', songs);
+app.route('/api/collections', collections);
 app.route('/api/sources', sources);
 
 // serveStatic resolves against process.cwd(), so hand it a CWD-relative path

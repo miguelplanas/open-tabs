@@ -7,8 +7,11 @@ export const name = 'my-source';        // URL-safe id, used in /api/sources/:na
 export const label = 'My Source';       // shown in the UI
 
 // Return an array of results for a free-text query:
-// [{ title, artist, type, rating, votes, url }]
+// [{ title, artist, type, version, rating, votes, url }]
 // `url` is whatever fetchTab needs to retrieve the tab (usually the page URL).
+// `version` (optional, default 1) distinguishes multiple takes of the same
+// song: the search view groups results by song + artist and lists versions.
+// Only return results fetchTab can actually import (no paid/video formats).
 export async function search(q) { ... }
 
 // Given a result url, return an importable song:

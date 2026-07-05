@@ -1,6 +1,7 @@
 import { $app, api, escapeHtml, warmSong } from '../app.js';
 import { renderBody } from '../chords.js';
 import { toast } from '../ui.js';
+import { enableChordPopovers, hideChordPopover } from '../chord-shapes.js';
 
 const DRAFT_KEY = 'opentabs.import';
 
@@ -33,7 +34,9 @@ export async function previewView() {
       <button class="btn primary grow" id="save">Save to library</button>
     </div>`;
 
-  document.getElementById('body').innerHTML = renderBody(draft.body, 0);
+  const $body = document.getElementById('body');
+  $body.innerHTML = renderBody(draft.body, 0);
+  enableChordPopovers($body);
   document.getElementById('back').onclick = () => (location.hash = '#/search');
 
   // Non-blocking duplicate check: same normalized title + artist already saved.
@@ -77,4 +80,6 @@ export async function previewView() {
       toast('Save failed: ' + err.message, { danger: true });
     }
   };
+
+  return () => hideChordPopover();
 }

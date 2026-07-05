@@ -24,6 +24,13 @@ export function isChordToken(tok) {
   return CHORD_RE.test(tok);
 }
 
+// Split a chord token into its parts, e.g. "A7(4)/E" →
+// { root: 'A', quality: '7(4)', bass: 'E' }. Returns null for non-chords.
+export function parseChord(tok) {
+  const m = tok.match(CHORD_RE);
+  return m ? { root: m[1], quality: m[2] || '', bass: m[3] || null } : null;
+}
+
 export function isChordLine(line) {
   const tokens = line.trim().split(/\s+/).filter(Boolean);
   if (tokens.length === 0) return false;

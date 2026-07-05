@@ -247,7 +247,7 @@ code { font-family: var(--mono); font-size: 0.9em; }
   padding: 14px 14px 20px;
   touch-action: manipulation; /* no iOS double-tap zoom; double-tap toggles autoscroll */
 }
-.tabbody .chord { color: var(--chord); font-weight: 700; }
+.tabbody .chord { color: var(--chord); font-weight: 700; cursor: pointer; }
 .tabbody .section {
   font-family: var(--serif); font-style: italic; font-size: 1.15em; font-weight: 600;
   color: var(--accent);
@@ -390,6 +390,22 @@ label.f > * { margin-top: 4px; }
   background: var(--bg2); border: 1px solid var(--border); outline: none; text-align: center;
 }
 .login input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+
+/* Chord diagram popover (tap a chord in the tab body) */
+.chord-pop {
+  position: fixed; z-index: 60;
+  background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius);
+  box-shadow: var(--shadow); padding: 8px 10px 4px; text-align: center;
+}
+.chord-pop .cd-name { font-family: var(--mono); font-weight: 700; color: var(--chord); font-size: 15px; }
+.chord-pop .cd-none { color: var(--muted); font-size: 12.5px; padding: 10px 6px 12px; }
+.chord-pop .cd-line { stroke: var(--muted); stroke-width: 1; }
+.chord-pop .cd-nut { stroke: var(--fg); stroke-width: 3.5; }
+.chord-pop .cd-dot { fill: var(--accent); }
+.chord-pop .cd-open { fill: none; stroke: var(--muted); stroke-width: 1.4; }
+.chord-pop .cd-mark, .chord-pop .cd-fr {
+  fill: var(--muted); font: 11px var(--sans); text-anchor: middle;
+}
 
 /* Toasts */
 .toast-stack {

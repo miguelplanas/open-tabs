@@ -1,6 +1,7 @@
 import { $app, api, escapeHtml } from '../app.js';
 import { renderBody } from '../chords.js';
 import { addToCollectionDialog } from '../ui.js';
+import { enableChordPopovers, hideChordPopover } from '../chord-shapes.js';
 
 export async function readerView([id]) {
   let song;
@@ -97,6 +98,7 @@ export async function readerView([id]) {
   applyFontSize();
   render();
   updateProgress(); // the first call ran before the body had content
+  enableChordPopovers($body); // tap a chord to see its fingering
 
   document.getElementById('back').onclick = () => (location.hash = backHash);
   document.getElementById('edit').onclick = () => (location.hash = '#/edit/' + song.id);
@@ -218,6 +220,7 @@ export async function readerView([id]) {
   api(`/songs/${id}/played`, { method: 'POST', body: {} }).catch(() => {});
 
   return () => {
+    hideChordPopover();
     window.removeEventListener('scroll', updateProgress);
     document.removeEventListener('keydown', onKey);
     document.removeEventListener('visibilitychange', onVis);

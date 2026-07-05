@@ -5,11 +5,11 @@
 // Songs API: network-first with cache fallback so the library stays readable
 // offline. Only canonical URLs (/api/songs and /api/songs/:id) are cached to
 // keep the cache bounded; per-keystroke ?q= searches are not stored.
-const SHELL_CACHE = 'opentabs-shell-v9';
+const SHELL_CACHE = 'opentabs-shell-v10';
 const API_CACHE = 'opentabs-api-v3';
 const SHELL = [
   '/', '/index.html', '/css/app.css', '/manifest.webmanifest',
-  '/js/app.js', '/js/chords.js', '/js/ui.js',
+  '/js/app.js', '/js/chords.js', '/js/ui.js', '/js/chord-shapes.js',
   '/js/views/library.js', '/js/views/reader.js', '/js/views/editor.js',
   '/js/views/search.js', '/js/views/preview.js', '/js/views/login.js',
   '/js/views/collections.js', '/js/views/collection.js',

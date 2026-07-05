@@ -5,13 +5,14 @@
 // Songs API: network-first with cache fallback so the library stays readable
 // offline. Only canonical URLs (/api/songs and /api/songs/:id) are cached to
 // keep the cache bounded; per-keystroke ?q= searches are not stored.
-const SHELL_CACHE = 'opentabs-shell-v2';
-const API_CACHE = 'opentabs-api-v2';
+const SHELL_CACHE = 'opentabs-shell-v5';
+const API_CACHE = 'opentabs-api-v3';
 const SHELL = [
   '/', '/index.html', '/css/app.css', '/manifest.webmanifest',
-  '/js/app.js', '/js/chords.js',
+  '/js/app.js', '/js/chords.js', '/js/ui.js',
   '/js/views/library.js', '/js/views/reader.js', '/js/views/editor.js',
   '/js/views/search.js', '/js/views/login.js',
+  '/js/views/collections.js', '/js/views/collection.js',
   '/icons/icon.svg',
 ];
 
@@ -35,14 +36,18 @@ self.addEventListener('activate', (e) => {
 
 const cacheableApi = (url) =>
   (url.pathname === '/api/songs' && !url.search) ||
-  /^\/api\/songs\/\d+$/.test(url.pathname);
+  /^\/api\/songs\/\d+$/.test(url.pathname) ||
+  (url.pathname === '/api/collections' && !url.search) ||
+  /^\/api\/collections\/\d+$/.test(url.pathname);
 
 self.addEventListener('fetch', (e) => {
   const url = new URL(e.request.url);
   if (e.request.method !== 'GET' || url.origin !== location.origin) return;
 
   if (url.pathname.startsWith('/api/')) {
-    if (!url.pathname.startsWith('/api/songs')) return; // auth, sources: network only
+    // auth, sources: network only. Songs and collections use network-first
+    // with cache fallback so the library stays readable offline.
+    if (!url.pathname.startsWith('/api/songs') && !url.pathname.startsWith('/api/collections')) return;
     e.respondWith(
       fetch(e.request)
         .then((res) => {

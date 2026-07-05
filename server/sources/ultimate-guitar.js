@@ -16,13 +16,40 @@ const UA =
 
 const ALLOWED_HOSTS = new Set(['www.ultimate-guitar.com', 'tabs.ultimate-guitar.com']);
 
+// PHP's htmlspecialchars/htmlentities (what UG's templating uses) escapes
+// accented letters as named entities, e.g. Garc&iacute;a. This table covers
+// the Latin-1 letters that show up in Spanish/European titles and artists;
+// numeric entities (&#225; / &#x00e1;) are decoded generically below.
+const NAMED_ENTITIES = {
+  aacute: 'á', Aacute: 'Á',
+  eacute: 'é', Eacute: 'É',
+  iacute: 'í', Iacute: 'Í',
+  oacute: 'ó', Oacute: 'Ó',
+  uacute: 'ú', Uacute: 'Ú',
+  ntilde: 'ñ', Ntilde: 'Ñ',
+  uuml: 'ü', Uuml: 'Ü',
+  agrave: 'à', Agrave: 'À',
+  egrave: 'è', Egrave: 'È',
+  igrave: 'ì', Igrave: 'Ì',
+  ograve: 'ò', Ograve: 'Ò',
+  ugrave: 'ù', Ugrave: 'Ù',
+  ccedil: 'ç', Ccedil: 'Ç',
+  nbsp: ' ',
+  hellip: '…',
+  ndash: '–', mdash: '—',
+  lsquo: '‘', rsquo: '’',
+  ldquo: '“', rdquo: '”',
+};
+
 function decodeEntities(s) {
-  // &amp; must be decoded last or nested entities double-decode.
   return s
+    .replace(/&#x([0-9a-fA-F]+);/g, (_, hex) => String.fromCodePoint(parseInt(hex, 16)))
+    .replace(/&#(\d+);/g, (_, dec) => String.fromCodePoint(parseInt(dec, 10)))
+    .replace(/&([a-zA-Z]+);/g, (m, name) => NAMED_ENTITIES[name] ?? m)
     .replaceAll('&quot;', '"')
-    .replaceAll('&#039;', "'")
     .replaceAll('&lt;', '<')
     .replaceAll('&gt;', '>')
+    // &amp; must be decoded last or nested entities (e.g. &amp;aacute;) double-decode.
     .replaceAll('&amp;', '&');
 }
 
@@ -66,6 +93,10 @@ async function fetchStore(url) {
   return JSON.parse(decodeEntities(m[1]));
 }
 
+// Result types that cannot be imported as plain text (paid Pro/Official
+// formats, Guitar Pro files, video lessons); the UI should never offer them.
+const EXCLUDED_TYPES = new Set(['Pro', 'Power', 'Official', 'Video']);
+
 export async function search(q) {
   const url =
     'https://www.ultimate-guitar.com/search.php?search_type=title&value=' +
@@ -73,11 +104,12 @@ export async function search(q) {
   const store = await fetchStore(url);
   const results = store?.store?.page?.data?.results || [];
   return results
-    .filter((r) => r.tab_url && !r.marketing_type)
+    .filter((r) => r.tab_url && !r.marketing_type && !EXCLUDED_TYPES.has(r.type))
     .map((r) => ({
       title: r.song_name || '',
       artist: r.artist_name || '',
       type: r.type || '',
+      version: Number(r.version) || 1,
       rating: r.rating ? Math.round(r.rating * 100) / 100 : null,
       votes: r.votes ?? null,
       url: r.tab_url,

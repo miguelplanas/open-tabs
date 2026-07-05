@@ -4,14 +4,14 @@ import { db } from './db.js';
 export const songs = new Hono();
 
 const LIST_COLS =
-  'id, title, artist, tags, capo, source, updated_at, played_at';
+  'id, title, artist, capo, source, updated_at, played_at';
 const listStmt = db.prepare(
   `SELECT ${LIST_COLS} FROM songs
    ORDER BY played_at DESC NULLS LAST, updated_at DESC`
 );
 const searchStmt = db.prepare(
   `SELECT ${LIST_COLS} FROM songs
-   WHERE title LIKE ? OR artist LIKE ? OR tags LIKE ?
+   WHERE norm(title) LIKE norm(?) OR norm(artist) LIKE norm(?)
    ORDER BY played_at DESC NULLS LAST, updated_at DESC`
 );
 const getStmt = db.prepare('SELECT * FROM songs WHERE id = ?');
@@ -19,7 +19,7 @@ const getStmt = db.prepare('SELECT * FROM songs WHERE id = ?');
 songs.get('/', (c) => {
   const q = (c.req.query('q') || '').trim();
   const like = `%${q}%`;
-  return c.json(q ? searchStmt.all(like, like, like) : listStmt.all());
+  return c.json(q ? searchStmt.all(like, like) : listStmt.all());
 });
 
 songs.get('/:id', (c) => {
@@ -29,7 +29,7 @@ songs.get('/:id', (c) => {
 
 const FIELDS = {
   title: 'string', artist: 'string', body: 'string', tuning: 'string',
-  tags: 'string', source: 'string', source_url: 'string',
+  source: 'string', source_url: 'string',
   capo: 'number', scroll_speed: 'number', transpose: 'number',
 };
 

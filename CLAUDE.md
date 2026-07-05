@@ -7,7 +7,7 @@ Owner uses it primarily on iPhone as an installed PWA; laptop secondary.
 
 - Node 22 + Hono + better-sqlite3, no build step anywhere.
 - `server/` is the JSON API (`/api/...`), `public/` is a vanilla-JS SPA (hash routing) served statically.
-- SQLite file lives at `OPENTABS_DB` (default `data/opentabs.db`). One table: `songs`.
+- SQLite file lives at `OPENTABS_DB` (default `data/opentabs.db`). Tables: `songs`, `collections`, and the `collection_songs` join table (ordered many-to-many; `foreign_keys` pragma is ON for cascade deletes). Collections (folders/albums/setlists) live in `server/collections.js` under `/api/collections`.
 - Auth: single password via `OPENTABS_PASSWORD` env var, HMAC session cookie (`server/auth.js`). Auth is disabled when the var is unset (local dev).
 - Tab sources (online search/import) are pluggable providers in `server/sources/`; contract documented in `server/sources/provider.md`. The frontend discovers providers via `GET /api/sources`, so new providers need no frontend changes.
 

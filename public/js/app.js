@@ -2,6 +2,8 @@ import { libraryView } from './views/library.js';
 import { readerView } from './views/reader.js';
 import { editorView } from './views/editor.js';
 import { searchView } from './views/search.js';
+import { collectionsView } from './views/collections.js';
+import { collectionView } from './views/collection.js';
 import { loginView } from './views/login.js';
 
 export const $app = document.getElementById('app');
@@ -47,6 +49,8 @@ const routes = [
   { re: /^#\/edit\/(\d+)$/, view: editorView },
   { re: /^#\/new$/, view: editorView },
   { re: /^#\/search$/, view: searchView },
+  { re: /^#\/collections$/, view: collectionsView },
+  { re: /^#\/collection\/(\d+)$/, view: collectionView },
   { re: /^#\/login$/, view: loginView },
 ];
 

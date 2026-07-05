@@ -9,7 +9,8 @@ export async function loginView() {
 
   $app.innerHTML = `
     <div class="login">
-      <h1>🎸 OpenTabs</h1>
+      <div class="strings"></div>
+      <h1>OpenTabs</h1>
       <input type="password" id="pw" placeholder="Password" autocomplete="current-password">
       <button class="btn primary" id="go">Sign in</button>
       <div class="error" id="err"></div>

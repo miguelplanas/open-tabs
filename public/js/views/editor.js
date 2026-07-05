@@ -1,10 +1,11 @@
 import { $app, api, escapeHtml } from '../app.js';
 import { renderBody } from '../chords.js';
+import { toast, confirmDialog } from '../ui.js';
 
 // Handles #/new (no id), #/edit/:id, and imports handed over from the
 // online search view via sessionStorage.
 export async function editorView([id]) {
-  let song = { title: '', artist: '', body: '', capo: 0, tuning: '', tags: '' };
+  let song = { title: '', artist: '', body: '', capo: 0, tuning: '' };
   if (id) {
     try {
       song = await api('/songs/' + id);
@@ -44,9 +45,6 @@ export async function editorView([id]) {
           </label>
           <label class="f">Tuning
             <input name="tuning" value="${escapeHtml(song.tuning || '')}" placeholder="Standard">
-          </label>
-          <label class="f">Tags
-            <input name="tags" value="${escapeHtml(song.tags || '')}" placeholder="acoustic, campfire">
           </label>
         </div>
         <label class="f">Tab (paste chords over lyrics or ASCII tab)
@@ -90,7 +88,7 @@ export async function editorView([id]) {
         : await api('/songs', { method: 'POST', body: data });
       location.hash = '#/song/' + saved.id;
     } catch (err) {
-      alert('Save failed: ' + err.message);
+      toast('Save failed: ' + err.message, { danger: true });
     }
   }
   document.getElementById('save').onclick = save;
@@ -99,12 +97,16 @@ export async function editorView([id]) {
   const $del = document.getElementById('delete');
   if ($del) {
     $del.onclick = async () => {
-      if (!confirm(`Delete "${song.title}"? This cannot be undone.`)) return;
+      const ok = await confirmDialog(`Delete "${song.title}"? This cannot be undone.`, {
+        danger: true,
+        confirmLabel: 'Delete',
+      });
+      if (!ok) return;
       try {
         await api('/songs/' + id, { method: 'DELETE' });
         location.hash = '#/';
       } catch (err) {
-        alert('Delete failed: ' + err.message);
+        toast('Delete failed: ' + err.message, { danger: true });
       }
     };
   }

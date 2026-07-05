@@ -2,6 +2,7 @@ import { libraryView } from './views/library.js';
 import { readerView } from './views/reader.js';
 import { editorView } from './views/editor.js';
 import { searchView } from './views/search.js';
+import { previewView } from './views/preview.js';
 import { collectionsView } from './views/collections.js';
 import { collectionView } from './views/collection.js';
 import { loginView } from './views/login.js';
@@ -49,6 +50,7 @@ const routes = [
   { re: /^#\/edit\/(\d+)$/, view: editorView },
   { re: /^#\/new$/, view: editorView },
   { re: /^#\/search$/, view: searchView },
+  { re: /^#\/preview$/, view: previewView },
   { re: /^#\/collections$/, view: collectionsView },
   { re: /^#\/collection\/(\d+)$/, view: collectionView },
   { re: /^#\/login$/, view: loginView },

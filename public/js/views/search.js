@@ -152,16 +152,19 @@ export async function searchView() {
   }
 
   async function importTab(r, el) {
-    el.style.opacity = '0.5';
+    el.classList.add('busy');
+    const label = h('<span class="busy-label">Importing…</span>');
+    el.append(label);
     try {
       const tab = await api(
         `/sources/${$source.value}/tab?url=` + encodeURIComponent(r.url)
       );
-      // Hand the imported tab to the editor for review before saving.
+      // Hand the imported tab to the preview view for review before saving.
       sessionStorage.setItem('opentabs.import', JSON.stringify(tab));
-      location.hash = '#/new';
+      location.hash = '#/preview';
     } catch (err) {
-      el.style.opacity = '';
+      el.classList.remove('busy');
+      label.remove();
       toast('Import failed: ' + err.message, { danger: true });
     }
   }

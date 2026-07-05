@@ -1,9 +1,10 @@
 import { Hono } from 'hono';
 import * as ultimateGuitar from './ultimate-guitar.js';
+import * as cifraClub from './cifraclub.js';
 
-// Provider contract (see provider.md): { name, label, search(q), fetchTab(url) }
+// Provider contract (see provider.md): { name, label, hosts?, search(q), fetchTab(url) }
 const providers = new Map();
-for (const p of [ultimateGuitar]) providers.set(p.name, p);
+for (const p of [ultimateGuitar, cifraClub]) providers.set(p.name, p);
 
 export const sources = new Hono();
 

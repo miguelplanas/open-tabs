@@ -55,6 +55,10 @@ export async function readerView([id]) {
     </div>
     <pre class="tabbody" id="body"></pre>
     <div class="songend strings"></div>
+    ${inSetlist && setIdx < setlist.ids.length - 1 ? `
+    <button class="btn primary next-song" id="next-song" hidden>
+      Next: ${escapeHtml(setlist.titles?.[setIdx + 1] || 'next song')} ›
+    </button>` : ''}
     <div class="reader-controls">
       <button class="btn primary icon play" id="play" title="Autoscroll">▶</button>
       <input type="range" id="speed" min="4" max="120" step="1" value="${speed}" title="Scroll speed">
@@ -71,9 +75,14 @@ export async function readerView([id]) {
   const $trVal = document.getElementById('tr-val');
   const $progress = document.getElementById('progress');
 
+  // In a setlist, surface "Next: …" once the reader hits the end of the song,
+  // so advancing never requires scrolling back to the top bar.
+  const $next = document.getElementById('next-song');
+
   function updateProgress() {
     const max = document.body.scrollHeight - window.innerHeight;
     $progress.style.top = (max > 0 ? (100 * window.scrollY) / max : 0) + '%';
+    if ($next) $next.hidden = window.scrollY < max - 40;
   }
   window.addEventListener('scroll', updateProgress, { passive: true });
   updateProgress();
@@ -87,6 +96,7 @@ export async function readerView([id]) {
   }
   applyFontSize();
   render();
+  updateProgress(); // the first call ran before the body had content
 
   document.getElementById('back').onclick = () => (location.hash = backHash);
   document.getElementById('edit').onclick = () => (location.hash = '#/edit/' + song.id);
@@ -95,6 +105,7 @@ export async function readerView([id]) {
     const goTo = (i) => { if (i >= 0 && i < setlist.ids.length) location.hash = '#/song/' + setlist.ids[i]; };
     document.getElementById('prev').onclick = () => goTo(setIdx - 1);
     document.getElementById('next').onclick = () => goTo(setIdx + 1);
+    if ($next) $next.onclick = () => goTo(setIdx + 1);
   }
   document.getElementById('tr-up').onclick = () => { transpose = Math.min(11, transpose + 1); dirty = true; render(); };
   document.getElementById('tr-down').onclick = () => { transpose = Math.max(-11, transpose - 1); dirty = true; render(); };
@@ -145,6 +156,26 @@ export async function readerView([id]) {
     setWakeLock(playing);
   }
   $play.onclick = () => toggle();
+
+  // Double-tap the tab body to toggle autoscroll: much easier than the play
+  // button with a guitar in hand. Manual detection, since dblclick is
+  // unreliable in the iOS standalone PWA; scroll gestures and taps on chords
+  // (reserved for future use) don't count.
+  let tapT = 0, tapX = 0, tapY = 0, tapMoved = false, downX = 0, downY = 0;
+  $body.addEventListener('pointerdown', (e) => {
+    tapMoved = false;
+    downX = e.clientX; downY = e.clientY;
+  });
+  $body.addEventListener('pointermove', (e) => {
+    if (Math.abs(e.clientX - downX) + Math.abs(e.clientY - downY) > 12) tapMoved = true;
+  });
+  $body.addEventListener('pointerup', (e) => {
+    if (tapMoved || e.target.closest('.chord')) { tapT = 0; return; }
+    const isDouble = e.timeStamp - tapT < 350 &&
+      Math.abs(e.clientX - tapX) < 30 && Math.abs(e.clientY - tapY) < 30;
+    if (isDouble) { tapT = 0; toggle(); return; }
+    tapT = e.timeStamp; tapX = e.clientX; tapY = e.clientY;
+  });
 
   // Space toggles autoscroll (handy on the laptop); ignore it while typing.
   function onKey(e) {

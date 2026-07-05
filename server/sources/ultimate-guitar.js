@@ -14,7 +14,8 @@ const UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36';
 
-const ALLOWED_HOSTS = new Set(['www.ultimate-guitar.com', 'tabs.ultimate-guitar.com']);
+export const hosts = ['www.ultimate-guitar.com', 'tabs.ultimate-guitar.com'];
+const ALLOWED_HOSTS = new Set(hosts);
 
 // PHP's htmlspecialchars/htmlentities (what UG's templating uses) escapes
 // accented letters as named entities, e.g. Garc&iacute;a. This table covers

@@ -13,7 +13,7 @@ export async function searchView() {
       <select id="source" class="btn"></select>
     </header>
     <main class="content">
-      <input class="searchbox" id="q" type="search" placeholder="Song or artist…" autocomplete="off">
+      <input class="searchbox" id="q" type="search" placeholder="Song, artist, or paste a tab URL…" autocomplete="off">
       <div class="chips" id="types" hidden></div>
       <ul class="songlist" id="results"></ul>
     </main>`;
@@ -129,11 +129,34 @@ export async function searchView() {
     return ul;
   }
 
+  // A pasted tab URL skips search and imports directly through whichever
+  // provider claims its hostname (providers export `hosts`).
+  function asTabUrl(q) {
+    if (!/^https?:\/\//i.test(q)) return null;
+    try { return new URL(q); } catch { return null; }
+  }
+
   async function search() {
     const my = ++gen;
     const q = $q.value.trim();
     $types.hidden = true;
     if (!q) { $results.innerHTML = ''; sessionStorage.removeItem(STATE_KEY); return; }
+
+    const pasted = asTabUrl(q);
+    if (pasted) {
+      const p = sourcesList.find((s) => (s.hosts || []).includes(pasted.hostname));
+      if (!p) {
+        $results.innerHTML = `<li class="empty">No source can import URLs from
+          <code>${escapeHtml(pasted.hostname)}</code>.</li>`;
+        return;
+      }
+      const row = h('<li class="spinner"></li>');
+      $results.innerHTML = '';
+      $results.append(row);
+      importTab({ url: pasted.href }, row, p.name);
+      return;
+    }
+
     $results.innerHTML = '<li class="spinner">Searching…</li>';
     try {
       const rows = await api(
@@ -151,13 +174,13 @@ export async function searchView() {
     }
   }
 
-  async function importTab(r, el) {
+  async function importTab(r, el, sourceName = $source.value) {
     el.classList.add('busy');
     const label = h('<span class="busy-label">Importing…</span>');
     el.append(label);
     try {
       const tab = await api(
-        `/sources/${$source.value}/tab?url=` + encodeURIComponent(r.url)
+        `/sources/${sourceName}/tab?url=` + encodeURIComponent(r.url)
       );
       // Hand the imported tab to the preview view for review before saving.
       sessionStorage.setItem('opentabs.import', JSON.stringify(tab));

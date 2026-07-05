@@ -8,7 +8,9 @@ for (const p of [ultimateGuitar]) providers.set(p.name, p);
 export const sources = new Hono();
 
 sources.get('/', (c) =>
-  c.json([...providers.values()].map(({ name, label }) => ({ name, label })))
+  c.json([...providers.values()].map(({ name, label, hosts }) => ({
+    name, label, hosts: hosts || [],
+  })))
 );
 
 sources.get('/:name/search', async (c) => {

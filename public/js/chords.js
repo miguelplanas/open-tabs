@@ -10,8 +10,10 @@ const FLAT_NAMES = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 
 // A single chord token: root + quality/extensions + optional bass note.
 // 'o' (diminished) and accidental modifiers only count when followed by a
 // digit, so lyric words like "Go", "Do" or "Bob" are not mistaken for chords.
+// Parenthesized extension groups cover CifraClub-style spellings such as
+// A7(4), C7(9), E7(#5) or D9(11/13).
 const CHORD_RE =
-  /^\(?([A-G][#b]?)((?:maj|min|m|M|dim|aug|sus|add|\+|°|[ob#](?=\d)|\d)*)(?:\/([A-G][#b]?))?\)?\**$/;
+  /^\(?([A-G][#b]?)((?:maj|min|m|M|dim|aug|sus|add|\+|°|[ob#](?=\d)|\d|\([#b+-]?\d+(?:[,/][#b+-]?\d+)*\))*)(?:\/([A-G][#b]?))?\)?\**$/;
 
 // Tokens allowed on a chord line without being chords themselves.
 // Asterisks are footnote markers ("Am *", "Cmaj7 **"): kept in the output

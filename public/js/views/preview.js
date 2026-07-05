@@ -1,4 +1,4 @@
-import { $app, api, escapeHtml } from '../app.js';
+import { $app, api, escapeHtml, warmSong } from '../app.js';
 import { renderBody } from '../chords.js';
 import { toast } from '../ui.js';
 
@@ -70,6 +70,7 @@ export async function previewView() {
     try {
       const saved = await api('/songs', { method: 'POST', body: data });
       sessionStorage.removeItem(DRAFT_KEY);
+      warmSong(saved.id); // make the new song offline-safe right away
       location.hash = '#/song/' + saved.id;
     } catch (err) {
       $save.disabled = false;

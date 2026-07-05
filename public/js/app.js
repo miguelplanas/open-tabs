@@ -88,3 +88,37 @@ route();
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('/sw.js').catch(() => {});
 }
+
+// Offline cache warmer: the service worker only caches songs and collections
+// as they are fetched, so a song imported but never opened would be missing
+// offline. Fetch everything once per app load (deferred, best-effort) so the
+// whole library is readable with no signal.
+export function warmSong(id) {
+  fetch(`/api/songs/${id}`).catch(() => {});
+}
+
+let warmed = false;
+async function warmOfflineCache() {
+  if (warmed || !navigator.onLine || !('serviceWorker' in navigator)) return;
+  warmed = true;
+  try {
+    const [songRes, colRes] = await Promise.all([
+      fetch('/api/songs'),
+      fetch('/api/collections'),
+    ]);
+    if (!songRes.ok || !colRes.ok) throw new Error('warm skipped');
+    const urls = [
+      ...(await songRes.json()).map((s) => `/api/songs/${s.id}`),
+      ...(await colRes.json()).map((c) => `/api/collections/${c.id}`),
+    ];
+    let i = 0;
+    const worker = async () => {
+      while (i < urls.length) await fetch(urls[i++]).catch(() => {});
+    };
+    await Promise.all([worker(), worker(), worker()]);
+  } catch {
+    warmed = false; // retry on the next load
+  }
+}
+const whenIdle = window.requestIdleCallback || ((fn) => setTimeout(fn, 2500));
+whenIdle(() => warmOfflineCache());

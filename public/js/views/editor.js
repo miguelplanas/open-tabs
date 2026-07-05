@@ -1,4 +1,4 @@
-import { $app, api, escapeHtml } from '../app.js';
+import { $app, api, escapeHtml, warmSong } from '../app.js';
 import { renderBody } from '../chords.js';
 import { toast, confirmDialog } from '../ui.js';
 
@@ -86,6 +86,7 @@ export async function editorView([id]) {
       const saved = id
         ? await api('/songs/' + id, { method: 'PUT', body: data })
         : await api('/songs', { method: 'POST', body: data });
+      warmSong(saved.id); // refresh the offline copy
       location.hash = '#/song/' + saved.id;
     } catch (err) {
       toast('Save failed: ' + err.message, { danger: true });

@@ -89,7 +89,9 @@ export async function collectionView([id]) {
   // Persist the current order so the reader can offer prev/next through it.
   function saveSetlist() {
     sessionStorage.setItem(SETLIST_KEY, JSON.stringify({
-      id: col.id, name: col.name, ids: col.songs.map((s) => s.id),
+      id: col.id, name: col.name,
+      ids: col.songs.map((s) => s.id),
+      titles: col.songs.map((s) => s.title),
     }));
   }
 

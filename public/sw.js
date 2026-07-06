@@ -5,7 +5,7 @@
 // Songs API: network-first with cache fallback so the library stays readable
 // offline. Only canonical URLs (/api/songs and /api/songs/:id) are cached to
 // keep the cache bounded; per-keystroke ?q= searches are not stored.
-const SHELL_CACHE = 'opentabs-shell-v10';
+const SHELL_CACHE = 'opentabs-shell-v11';
 const API_CACHE = 'opentabs-api-v3';
 const SHELL = [
   '/', '/index.html', '/css/app.css', '/manifest.webmanifest',
@@ -48,17 +48,34 @@ self.addEventListener('fetch', (e) => {
     // auth, sources: network only. Songs and collections use network-first
     // with cache fallback so the library stays readable offline.
     if (!url.pathname.startsWith('/api/songs') && !url.pathname.startsWith('/api/collections')) return;
-    e.respondWith(
-      fetch(e.request)
-        .then((res) => {
-          if (res.ok && cacheableApi(url)) {
-            const copy = res.clone();
-            caches.open(API_CACHE).then((c) => c.put(e.request, copy));
-          }
-          return res;
-        })
-        .catch(() => caches.match(e.request))
-    );
+    e.respondWith((async () => {
+      // An unreachable server (VPN down, flaky signal) hangs fetch for tens
+      // of seconds rather than failing, so when a cached copy exists the
+      // network only gets a short head start before the cache wins.
+      const cached = await caches.match(e.request);
+      const network = fetch(e.request).then((res) => {
+        if (res.ok && cacheableApi(url)) {
+          const copy = res.clone();
+          caches.open(API_CACHE).then((c) => c.put(e.request, copy));
+        }
+        return res;
+      });
+      try {
+        if (!cached) return await network;
+        return await Promise.race([
+          network,
+          new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 3500)),
+        ]);
+      } catch {
+        network.catch(() => {}); // may still settle after losing the race
+        // respondWith(undefined) is a hard SW error ("response is null" on
+        // iOS), so cache misses become an explicit 503 the app can show.
+        return cached || new Response(JSON.stringify({ error: 'Offline and not cached' }), {
+          status: 503,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+    })());
     return;
   }
 
@@ -71,7 +88,7 @@ self.addEventListener('fetch', (e) => {
           if (res.ok) cache.put(e.request, res.clone());
           return res;
         })
-        .catch(() => cached);
+        .catch(() => cached || Response.error());
       return cached || refresh;
     })
   );

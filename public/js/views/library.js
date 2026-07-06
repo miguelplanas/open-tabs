@@ -87,7 +87,10 @@ export async function libraryView() {
   async function load() {
     const my = ++gen;
     try {
-      all = await api('/songs?q=' + encodeURIComponent($q.value.trim()));
+      // No query: hit the canonical /songs URL, which the service worker
+      // caches for offline. ?q= URLs are deliberately never cached.
+      const q = $q.value.trim();
+      all = await api(q ? '/songs?q=' + encodeURIComponent(q) : '/songs');
       if (my !== gen) return; // a newer search superseded this response
       if (!$q.value.trim()) {
         const n = all.length;

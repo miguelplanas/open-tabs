@@ -7,8 +7,8 @@ Owner uses it primarily on iPhone as an installed PWA; laptop secondary.
 
 - Node 22 + Hono + better-sqlite3, no build step anywhere.
 - `server/` is the JSON API (`/api/...`), `public/` is a vanilla-JS SPA (hash routing) served statically.
-- SQLite file lives at `OPENTABS_DB` (default `data/opentabs.db`). Tables: `songs`, `collections`, and the `collection_songs` join table (ordered many-to-many; `foreign_keys` pragma is ON for cascade deletes). Collections (folders/albums/setlists) live in `server/collections.js` under `/api/collections`.
-- Auth: single password via `OPENTABS_PASSWORD` env var, HMAC session cookie (`server/auth.js`). Auth is disabled when the var is unset (local dev).
+- SQLite file lives at `OPENTABS_DB` (default `data/opentabs.db`). Tables: `songs`, `collections`, the `collection_songs` join table (ordered many-to-many; `foreign_keys` pragma is ON for cascade deletes), and `sessions` for auth. Collections (folders/albums/setlists) live in `server/collections.js` under `/api/collections`.
+- Auth: single password via `OPENTABS_PASSWORD` env var; login mints a random token stored in the `sessions` table and set as an httpOnly cookie (`server/auth.js`). Auth is disabled when the var is unset (local dev).
 - Tab sources (online search/import) are pluggable providers in `server/sources/`; contract documented in `server/sources/provider.md`. The frontend discovers providers via `GET /api/sources`, so new providers need no frontend changes.
 
 ## Conventions
@@ -21,6 +21,7 @@ Owner uses it primarily on iPhone as an installed PWA; laptop secondary.
 ## Commands
 
 - `npm start` to run, `npm run dev` for watch mode. Port via `PORT` (default 3000).
+- `npm test` runs the unit suite (Node's built-in `node:test`, no deps) over the pure logic in `test/`: chord detection/transpose, chord-diagram shapes, entity decoding.
 - `docker compose up --build` for the container; data persists in `./data`.
 
 ## User preferences

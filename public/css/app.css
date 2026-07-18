@@ -244,7 +244,10 @@ code { font-family: var(--mono); font-size: 0.9em; }
   font: 14px/1.45 var(--mono);
   white-space: pre; overflow-x: auto;
   margin: 0;
-  padding: 14px 14px 20px;
+  /* Generous top gap so the first line starts lower on screen: reading and
+     following along feel natural once autoscroll begins. Width is fitted to
+     the viewport in JS (reader.js), so overflow-x is only a last resort. */
+  padding: 12vh 14px 8px;
   touch-action: manipulation; /* no iOS double-tap zoom; double-tap toggles autoscroll */
 }
 .tabbody .chord { color: var(--chord); font-weight: 700; cursor: pointer; }
@@ -254,13 +257,13 @@ code { font-family: var(--mono); font-size: 0.9em; }
 }
 .tabbody .tabline { color: var(--tabline); }
 
-/* End-of-song marker + runway so the last lines can scroll to the top. */
+/* End-of-song marker. Just enough runway for the last line to clear the fixed
+   controls bar; autoscroll stops at the last line (reader.js), so there is no
+   long blank tail to scroll through once the song has finished. */
 .songend {
   margin: 14px auto 0;
   max-width: 220px;
-  /* Runway so the last lines can scroll up; padding (not margin) so it
-     counts toward scrollHeight and autoscroll's end detection. */
-  padding-bottom: calc(60vh + var(--safe-bottom));
+  padding-bottom: calc(96px + var(--safe-bottom));
 }
 
 /* Fret-inlay scroll rail: fixed dots mark the neck (frets 3-5-7-9 and a hollow
@@ -299,7 +302,26 @@ code { font-family: var(--mono); font-size: 0.9em; }
   border-top: 1px solid var(--border);
 }
 .reader-controls .grow { flex: 1; }
-.reader-controls input[type=range] { flex: 1; min-width: 90px; accent-color: var(--accent); }
+.reader-controls .speed-ctl {
+  flex: 1; min-width: 130px;
+  display: flex; align-items: center; gap: 8px;
+}
+.reader-controls .speed-ctl input[type=range] {
+  flex: 1; min-width: 70px; accent-color: var(--accent);
+}
+.reader-controls .speed-ctl input[type=number] {
+  width: 3.2em; text-align: center; min-height: 40px;
+  padding: 7px 4px; border-radius: 8px;
+  background: var(--bg3); border: 1px solid var(--border); color: var(--fg);
+  font: 13px var(--mono); -moz-appearance: textfield;
+}
+.reader-controls .speed-ctl input[type=number]:focus {
+  outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft);
+}
+.reader-controls .speed-ctl input[type=number]::-webkit-outer-spin-button,
+.reader-controls .speed-ctl input[type=number]::-webkit-inner-spin-button {
+  -webkit-appearance: none; margin: 0;
+}
 .reader-controls .btn.play { border-radius: 999px; min-width: 44px; }
 .reader-controls .btn.play.playing {
   box-shadow: 0 0 0 4px var(--accent-soft), 0 0 18px -2px var(--accent);

@@ -22,6 +22,10 @@ db.function('norm', { deterministic: true }, (s) =>
     : s
 );
 
+// Default autoscroll speed (px/second) for new songs. Kept gentle: the old
+// 20 px/s baseline scrolled faster than most people can comfortably play to.
+export const DEFAULT_SCROLL_SPEED = 6;
+
 db.exec(`
   CREATE TABLE IF NOT EXISTS songs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -30,7 +34,7 @@ db.exec(`
     body TEXT NOT NULL DEFAULT '',
     capo INTEGER NOT NULL DEFAULT 0,
     tuning TEXT NOT NULL DEFAULT '',
-    scroll_speed REAL NOT NULL DEFAULT 20,
+    scroll_speed REAL NOT NULL DEFAULT 6,
     transpose INTEGER NOT NULL DEFAULT 0,
     source TEXT NOT NULL DEFAULT '',
     source_url TEXT NOT NULL DEFAULT '',
@@ -71,6 +75,15 @@ db.exec(`
 // removed. Guarded so it's a no-op on fresh databases (which never have it).
 const songCols = db.prepare('PRAGMA table_info(songs)').all().map((c) => c.name);
 if (songCols.includes('tags')) db.exec('ALTER TABLE songs DROP COLUMN tags');
+
+// One-time: bring songs still sitting on the old 20 px/s default down to the
+// gentler baseline. Guarded by user_version so a speed the owner deliberately
+// sets to 20 later is never clobbered on the next startup.
+if (db.pragma('user_version', { simple: true }) < 1) {
+  db.prepare('UPDATE songs SET scroll_speed = ? WHERE scroll_speed = 20')
+    .run(DEFAULT_SCROLL_SPEED);
+  db.pragma('user_version = 1');
+}
 
 // Sessions older than a year are expired; prune on startup.
 db.prepare("DELETE FROM sessions WHERE created_at < datetime('now', '-1 year')").run();

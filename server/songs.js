@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { db } from './db.js';
+import { db, DEFAULT_SCROLL_SPEED } from './db.js';
 
 export const songs = new Hono();
 
@@ -56,6 +56,9 @@ songs.post('/', async (c) => {
   const err = pick(await c.req.json().catch(() => ({})), data);
   if (err) return c.json({ error: err }, 400);
   if (data.title === undefined) return c.json({ error: 'title is required' }, 400);
+  // Apply the gentle default explicitly: existing databases keep the column's
+  // old default (20), so relying on it would give new songs the fast speed.
+  if (data.scroll_speed === undefined) data.scroll_speed = DEFAULT_SCROLL_SPEED;
   const cols = Object.keys(data);
   const info = db
     .prepare(

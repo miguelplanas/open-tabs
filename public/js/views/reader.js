@@ -3,6 +3,24 @@ import { renderBody } from '../chords.js';
 import { addToCollectionDialog } from '../ui.js';
 import { enableChordPopovers, hideChordPopover } from '../chord-shapes.js';
 
+// Autoscroll speed is persisted per song in pixels/second, but the reader
+// exposes it as a 1..20 "level": the slider then has a small set of fixed
+// steps and the number field takes a memorable value. Level 1 is a slow
+// crawl, level 20 a brisk 40 px/s; the default is deliberately gentle.
+const PX_PER_LEVEL = 2;
+const MIN_LEVEL = 1;
+const MAX_LEVEL = 20;
+const DEFAULT_SPEED = 6; // px/s, matches the server-side default
+const levelToSpeed = (lvl) => lvl * PX_PER_LEVEL;
+const speedToLevel = (px) =>
+  Math.min(MAX_LEVEL, Math.max(MIN_LEVEL, Math.round(px / PX_PER_LEVEL)));
+
+// Floor for the fit-to-width shrink: fits lines up to ~100 chars on a phone,
+// which covers real chord/lyric charts. It exists so one absurdly long line
+// (a malformed import) can't shrink the whole song to microscopic; such a
+// line falls back to scrolling inside the body instead.
+const MIN_FIT_FONT = 6;
+
 export async function readerView([id]) {
   let song;
   try {
@@ -22,7 +40,8 @@ export async function readerView([id]) {
   const backHash = inSetlist ? '#/collection/' + setlist.id : '#/';
 
   let transpose = song.transpose || 0;
-  let speed = song.scroll_speed || 20; // pixels per second
+  let speed = song.scroll_speed || DEFAULT_SPEED; // pixels per second
+  let level = speedToLevel(speed);
   let fontSize = Number(localStorage.getItem('opentabs.fontSize')) || 14;
   let playing = false;
   let wakeLock = null;
@@ -62,7 +81,10 @@ export async function readerView([id]) {
     </button>` : ''}
     <div class="reader-controls">
       <button class="btn primary icon play" id="play" title="Autoscroll">▶</button>
-      <input type="range" id="speed" min="4" max="120" step="1" value="${speed}" title="Scroll speed">
+      <div class="speed-ctl" title="Scroll speed">
+        <input type="range" id="speed" min="${MIN_LEVEL}" max="${MAX_LEVEL}" step="1" value="${level}" aria-label="Scroll speed">
+        <input type="number" id="speed-num" min="${MIN_LEVEL}" max="${MAX_LEVEL}" step="1" value="${level}" inputmode="numeric" aria-label="Scroll speed level">
+      </div>
       <div class="pill" title="Transpose">
         <button id="tr-down">♭</button><span id="tr-val"></span><button id="tr-up">♯</button>
       </div>
@@ -79,25 +101,63 @@ export async function readerView([id]) {
   // In a setlist, surface "Next: …" once the reader hits the end of the song,
   // so advancing never requires scrolling back to the top bar.
   const $next = document.getElementById('next-song');
+  const $controls = document.querySelector('.reader-controls');
+  const $speed = document.getElementById('speed');
+  const $speedNum = document.getElementById('speed-num');
+
+  // The scroll position at which the song is "done": the last line has reached
+  // just above the controls bar. Autoscroll and the progress dot both stop
+  // here rather than at the document bottom, so no blank tail scrolls past.
+  let endLimit = Infinity;
 
   function updateProgress() {
-    const max = document.body.scrollHeight - window.innerHeight;
-    $progress.style.top = (max > 0 ? (100 * window.scrollY) / max : 0) + '%';
+    const max = Number.isFinite(endLimit) && endLimit > 0
+      ? endLimit
+      : Math.max(0, document.body.scrollHeight - window.innerHeight);
+    const y = Math.min(window.scrollY, max);
+    $progress.style.top = (max > 0 ? (100 * y) / max : 0) + '%';
     if ($next) $next.hidden = window.scrollY < max - 40;
   }
   window.addEventListener('scroll', updateProgress, { passive: true });
-  updateProgress();
 
-  function applyFontSize() {
+  function fitWidth() {
+    // Fit the widest line to the viewport so a song never needs sideways
+    // dragging while you play. Only ever shrink from the chosen font size.
     $body.style.fontSize = fontSize + 'px';
+    const cs = getComputedStyle($body);
+    const padX = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight);
+    const avail = $body.clientWidth - padX;
+    const content = $body.scrollWidth - padX;
+    if (avail > 0 && content > avail) {
+      $body.style.fontSize = Math.max(MIN_FIT_FONT, (fontSize * (avail - 1)) / content) + 'px';
+    }
   }
+
+  function computeEndLimit() {
+    const cs = getComputedStyle($body);
+    const padBottom = parseFloat(cs.paddingBottom) || 0;
+    const textBottom = $body.getBoundingClientRect().bottom + window.scrollY - padBottom;
+    const controlsH = $controls ? $controls.offsetHeight : 0;
+    const docMax = document.documentElement.scrollHeight - window.innerHeight;
+    endLimit = Math.max(0, Math.min(textBottom + controlsH - window.innerHeight, docMax));
+  }
+
   function render() {
-    $body.innerHTML = renderBody(song.body || '', transpose);
+    // Trim the trailing blank lines so the "last line" autoscroll stops at is
+    // real content, not empty space at the tail of the source text.
+    $body.innerHTML = renderBody((song.body || '').replace(/\s+$/, ''), transpose);
     $trVal.textContent = transpose > 0 ? '+' + transpose : String(transpose);
   }
-  applyFontSize();
+
+  function relayout() {
+    fitWidth();
+    computeEndLimit();
+    updateProgress();
+  }
+
   render();
-  updateProgress(); // the first call ran before the body had content
+  relayout();
+  window.addEventListener('resize', relayout);
   enableChordPopovers($body); // tap a chord to see its fingering
 
   document.getElementById('back').onclick = () => (location.hash = backHash);
@@ -109,11 +169,23 @@ export async function readerView([id]) {
     document.getElementById('next').onclick = () => goTo(setIdx + 1);
     if ($next) $next.onclick = () => goTo(setIdx + 1);
   }
-  document.getElementById('tr-up').onclick = () => { transpose = Math.min(11, transpose + 1); dirty = true; render(); };
-  document.getElementById('tr-down').onclick = () => { transpose = Math.max(-11, transpose - 1); dirty = true; render(); };
-  document.getElementById('fs-up').onclick = () => { fontSize = Math.min(24, fontSize + 1); save(); applyFontSize(); };
-  document.getElementById('fs-down').onclick = () => { fontSize = Math.max(9, fontSize - 1); save(); applyFontSize(); };
-  document.getElementById('speed').oninput = (e) => { speed = Number(e.target.value); dirty = true; };
+  document.getElementById('tr-up').onclick = () => { transpose = Math.min(11, transpose + 1); dirty = true; render(); relayout(); };
+  document.getElementById('tr-down').onclick = () => { transpose = Math.max(-11, transpose - 1); dirty = true; render(); relayout(); };
+  document.getElementById('fs-up').onclick = () => { fontSize = Math.min(24, fontSize + 1); save(); relayout(); };
+  document.getElementById('fs-down').onclick = () => { fontSize = Math.max(9, fontSize - 1); save(); relayout(); };
+
+  // Slider (fixed 1..20 steps) and number field are two views of one level;
+  // whichever the user touches, the other follows.
+  function setLevel(next, from) {
+    level = Math.min(MAX_LEVEL, Math.max(MIN_LEVEL, Math.round(next) || MIN_LEVEL));
+    speed = levelToSpeed(level);
+    if (from !== 'range') $speed.value = String(level);
+    if (from !== 'num') $speedNum.value = String(level);
+    dirty = true;
+  }
+  $speed.oninput = (e) => setLevel(Number(e.target.value), 'range');
+  $speedNum.oninput = (e) => { if (e.target.value.trim() !== '') setLevel(Number(e.target.value), 'num'); };
+  $speedNum.onchange = () => { $speedNum.value = String(level); }; // normalize on blur/enter
   function save() { localStorage.setItem('opentabs.fontSize', String(fontSize)); }
 
   async function setWakeLock(on) {
@@ -137,11 +209,12 @@ export async function readerView([id]) {
       if (acc >= 1) {
         const px = Math.floor(acc);
         acc -= px;
-        window.scrollBy(0, px);
-        if (window.innerHeight + window.scrollY >= document.body.scrollHeight - 2) {
-          toggle(false); // reached the end
-          return;
-        }
+        // Stop within a pixel of the last line: scrollY is capped (and rounded
+        // by devicePixelRatio) at the document bottom, so it may never reach a
+        // fractional endLimit exactly. A 1px tolerance avoids scrolling forever.
+        const remaining = endLimit - window.scrollY;
+        if (remaining <= 1) { toggle(false); return; } // reached the last line
+        window.scrollBy(0, Math.min(px, remaining));
       }
     }
     last = ts;
@@ -222,6 +295,7 @@ export async function readerView([id]) {
   return () => {
     hideChordPopover();
     window.removeEventListener('scroll', updateProgress);
+    window.removeEventListener('resize', relayout);
     document.removeEventListener('keydown', onKey);
     document.removeEventListener('visibilitychange', onVis);
     window.removeEventListener('pagehide', flushSettings);

@@ -1,10 +1,13 @@
 import { Hono } from 'hono';
 import { db, DEFAULT_SCROLL_SPEED } from './db.js';
+import { detectKind } from '../public/js/chords.js';
 
 export const songs = new Hono();
 
+// `kind` and `tuning` ride along so the library can label a song's versions
+// (see versionPickerDialog) without fetching any bodies.
 const LIST_COLS =
-  'id, title, artist, capo, source, updated_at, played_at';
+  'id, title, artist, capo, tuning, kind, source, updated_at, played_at';
 const listStmt = db.prepare(
   `SELECT ${LIST_COLS} FROM songs
    ORDER BY played_at DESC NULLS LAST, updated_at DESC`
@@ -48,6 +51,9 @@ function pick(data, out) {
   if (out.title !== undefined && out.title.trim() === '') {
     return 'title must not be empty';
   }
+  // Always derived here, never accepted from the client: every write path goes
+  // through pick(), so kind can never drift from the body it describes.
+  if (out.body !== undefined) out.kind = detectKind(out.body);
   return null;
 }
 

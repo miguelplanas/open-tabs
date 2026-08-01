@@ -6,6 +6,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   isChordToken, isChordLine, isTabLine, parseChord, transposeChord, renderBody,
+  fitChars, detectKind,
 } from '../public/js/chords.js';
 
 test('isChordToken accepts real chords', () => {
@@ -92,4 +93,56 @@ test('renderBody transposes chords inside chord lines', () => {
   const out = renderBody('C   G', 2);
   assert.match(out, /class="chord">D</);
   assert.match(out, /class="chord">A</);
+});
+
+test('renderBody groups a consecutive stave into one scrollable block', () => {
+  const stave = ['e|--0--2--|', 'B|--1--3--|', 'G|--0--2--|'].join('\n');
+  const out = renderBody(`[Intro]\n${stave}\n\nlyrics`);
+  assert.equal(out.match(/class="tabblock"/g).length, 1);
+  assert.equal(out.match(/class="tabline"/g).length, 3);
+});
+
+test('renderBody keeps separate staves in separate blocks', () => {
+  const out = renderBody('e|--0--|\nB|--1--|\n\ne|--2--|\nB|--3--|');
+  assert.equal(out.match(/class="tabblock"/g).length, 2);
+});
+
+test('fitChars ignores tab staves and tolerates a lone long line', () => {
+  const body = [
+    'C     G',
+    'short lyric line',
+    'another short one',
+    'e|' + '-'.repeat(200) + '|', // a stave: scrolls on its own, never counted
+  ].join('\n');
+  assert.ok(fitChars(body) < 40, 'staves must not drive the fitted width');
+
+  // A single outlier among many normal lines is left to scroll sideways
+  // rather than shrinking every other line to fit it.
+  const withOutlier = [...Array(20).fill('a normal lyric line'), 'x'.repeat(300)].join('\n');
+  assert.equal(fitChars(withOutlier), 'a normal lyric line'.length);
+});
+
+test('detectKind separates tab arrangements from chord sheets and lyrics', () => {
+  const stave = ['e|--0--2--3--|', 'B|--1--3--0--|', 'G|--0--2--0--|'].join('\n');
+  assert.equal(detectKind(`[Intro]\nAm  G\n${stave}`), 'tabs');
+  assert.equal(detectKind('[Verse]\nC   G   Am\nlyrics here\nF   C\nmore lyrics'), 'chords');
+  assert.equal(detectKind('just words\nand more words'), 'lyrics');
+  assert.equal(detectKind(''), 'lyrics');
+});
+
+test('detectKind calls a chord sheet with one stray stave chords', () => {
+  // A chord sheet often ends with a single riff line; that must not turn the
+  // whole song into a tab.
+  const body = [
+    'C     G     Am', 'first line of lyrics',
+    'F     C     G', 'second line of lyrics',
+    'Am    F', 'third line of lyrics',
+    'e|--0--2--3--|',
+  ].join('\n');
+  assert.equal(detectKind(body), 'chords');
+});
+
+test('fitChars is zero for a body with nothing to fit', () => {
+  assert.equal(fitChars(''), 0);
+  assert.equal(fitChars('\n\n  \n'), 0);
 });

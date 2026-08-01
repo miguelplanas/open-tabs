@@ -102,6 +102,73 @@ function renderLine(line, semitones) {
   return `<span class="chordline">${html}</span>`;
 }
 
+// --- Reflow ---------------------------------------------------------------
+// A chord line and the lyric under it are one unit of meaning, but rendered as
+// two independent monospace lines they both have to fit the screen, and the
+// chord line is mostly padding spaces. That is what forces a 120-column song
+// down to a 6px font on a phone.
+//
+// Reflow binds every chord to the word it sits over and emits those pairs as
+// inline boxes, so the line wraps like a paragraph at whatever font size you
+// can actually read. A word never splits, which is what keeps a chord above
+// its own syllable. Cells are at least as wide as their chord, so chords never
+// collide; that is the one visible cost, slightly wider word spacing.
+
+// Chord tokens of a line with the column each one starts at.
+function chordColumns(line) {
+  const out = [];
+  const re = /\S+/g;
+  let m;
+  while ((m = re.exec(line))) if (isChordToken(m[0])) out.push({ col: m.index, text: m[0] });
+  return out;
+}
+
+// `chords` is a list because two chords can share a column (a change on the
+// same syllable). Each one stays its own .chord span: merging them into one
+// would silently stop them transposing and break the fingering popover.
+function cellHtml(chords, text, semitones) {
+  const top = chords
+    .map((c) => `<span class="chord">${escapeHtml(transposeChord(c, semitones))}</span>`)
+    .join(' ');
+  return `<span class="cell"><span class="ch">${top}</span><span class="ly">${escapeHtml(text)}</span></span>`;
+}
+
+// One chord line plus its lyric line, as wrappable words.
+function pairHtml(chordLine, lyricLine, semitones) {
+  const chords = chordColumns(chordLine);
+  const words = [];
+  const re = /\S+/g;
+  let m;
+  let ci = 0;
+  while ((m = re.exec(lyricLine))) {
+    const start = m.index;
+    const end = start + m[0].length;
+    // Everything up to the end of this word belongs to it, so chords sitting
+    // in the gap before a word attach to that word rather than being lost.
+    const mine = [];
+    while (ci < chords.length && chords[ci].col < end) mine.push(chords[ci++]);
+
+    const cuts = [...new Set(mine.map((c) => Math.max(0, c.col - start)))].sort((a, b) => a - b);
+    if (cuts[0] !== 0) cuts.unshift(0);
+    let html = '';
+    for (let i = 0; i < cuts.length; i++) {
+      const slice = m[0].slice(cuts[i], i + 1 < cuts.length ? cuts[i + 1] : undefined);
+      // Two chords on the same column render side by side in one cell.
+      const here = mine.filter((c) => Math.max(0, c.col - start) === cuts[i]).map((c) => c.text);
+      html += cellHtml(here, slice, semitones);
+    }
+    words.push(`<span class="word">${html}</span>`);
+  }
+  // Chords past the end of the lyric: instrumental tails, each its own word.
+  for (const c of chords.slice(ci)) {
+    words.push(`<span class="word">${cellHtml([c.text], '', semitones)}</span>`);
+  }
+  // Joined by a real space, deliberately outside the boxes: that space is both
+  // the gap between words and the only place the browser is allowed to break
+  // the line, since each word is nowrap.
+  return `<span class="row pair">${words.join(' ')}</span>`;
+}
+
 // Render a plain-text tab body to HTML with chords highlighted and transposed.
 //
 // Runs of consecutive ASCII tablature lines are wrapped in one `.tabblock`.
@@ -109,24 +176,54 @@ function renderLine(line, semitones) {
 // stave only makes sense with all six strings aligned, so the block gets its
 // own horizontal scroll (see app.css) instead of dragging the whole song down
 // to an unreadable font size to fit its widest line.
-export function renderBody(body, semitones = 0) {
+// With `reflow`, chord and lyric lines are paired and wrapped (see above) so
+// nothing needs a smaller font to fit; staves keep their own scroll either way,
+// since tablature cannot be reflowed without destroying it.
+export function renderBody(body, semitones = 0, { reflow = false } = {}) {
   const out = [];
+  const lines = body.split('\n');
   let stave = [];
+  // Reflowed rows are block boxes, so they bring their own line breaks and are
+  // joined with nothing. Plain rows are inline in a <pre> and rely on newlines.
+  // Mixing the two would double every gap in the song.
+  const row = (html) => (reflow ? `<span class="row">${html}</span>` : html);
   const flushStave = () => {
     if (stave.length === 0) return;
-    out.push(`<span class="tabblock">${stave.join('\n')}</span>`);
+    out.push(row(`<span class="tabblock">${stave.join('\n')}</span>`));
     stave = [];
   };
-  for (const line of body.split('\n')) {
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
     if (isTabLine(line)) {
       stave.push(`<span class="tabline">${escapeHtml(line)}</span>`);
       continue;
     }
     flushStave();
-    out.push(renderLine(line, semitones));
+    if (!reflow) {
+      out.push(renderLine(line, semitones));
+      continue;
+    }
+    if (isChordLine(line)) {
+      // Pair with the line below when it is lyrics; a chord line on its own
+      // (an intro or a break) still goes through the same path with no lyric,
+      // so it wraps as chord boxes instead of overflowing.
+      const next = lines[i + 1];
+      const paired = next !== undefined && next.trim() && !isChordLine(next) && !isTabLine(next);
+      out.push(pairHtml(line, paired ? next : '', semitones));
+      if (paired) i++;
+      continue;
+    }
+    if (/^\[.*\]\s*$/.test(line.trim())) {
+      out.push(`<span class="row section">${escapeHtml(line)}</span>`);
+      continue;
+    }
+    // A lyric line with no chords over it still has to wrap on a narrow screen.
+    out.push(line.trim()
+      ? `<span class="row flow">${escapeHtml(line)}</span>`
+      : '<span class="row"></span>');
   }
   flushStave();
-  return out.join('\n');
+  return out.join(reflow ? '' : '\n');
 }
 
 // Width, in characters, that the reader should size its font to fit.

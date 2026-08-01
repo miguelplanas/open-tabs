@@ -250,6 +250,16 @@ code { font-family: var(--mono); font-size: 0.9em; }
   padding: 12vh 14px 8px;
   touch-action: manipulation; /* no iOS double-tap zoom; double-tap toggles autoscroll */
 }
+/* An ASCII stave scrolls on its own. Staves run far wider than the chords and
+   lyrics around them and only read correctly with all six strings aligned, so
+   they get a swipeable block rather than dragging the whole song down to a
+   font size that fits their longest line. */
+.tabbody .tabblock {
+  display: inline-block; vertical-align: top;
+  max-width: 100%;
+  overflow-x: auto; overscroll-behavior-x: contain;
+  white-space: pre;
+}
 .tabbody .chord { color: var(--chord); font-weight: 700; cursor: pointer; }
 .tabbody .section {
   font-family: var(--serif); font-style: italic; font-size: 1.15em; font-weight: 600;
@@ -257,13 +267,13 @@ code { font-family: var(--mono); font-size: 0.9em; }
 }
 .tabbody .tabline { color: var(--tabline); }
 
-/* End-of-song marker. Just enough runway for the last line to clear the fixed
-   controls bar; autoscroll stops at the last line (reader.js), so there is no
-   long blank tail to scroll through once the song has finished. */
+/* End-of-song marker. Just enough runway for the last line to clear the dock;
+   autoscroll stops at the last line (reader.js), so there is no long blank
+   tail to scroll through once the song has finished. */
 .songend {
   margin: 14px auto 0;
   max-width: 220px;
-  padding-bottom: calc(96px + var(--safe-bottom));
+  padding-bottom: calc(88px + var(--safe-bottom));
 }
 
 /* Fret-inlay scroll rail: fixed dots mark the neck (frets 3-5-7-9 and a hollow
@@ -292,40 +302,65 @@ code { font-family: var(--mono); font-size: 0.9em; }
   transition: top 0.1s linear;
 }
 
-.reader-controls {
+/* Full-width action bar, used where the screen ends in a decision (the import
+   preview: save or edit) rather than in playing. */
+.action-bar {
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 20;
-  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  display: flex; align-items: center; gap: 8px;
   padding: 10px 14px calc(10px + var(--safe-bottom));
   background: var(--glass);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   border-top: 1px solid var(--border);
 }
-.reader-controls .grow { flex: 1; }
-.reader-controls .speed-ctl {
-  flex: 1; min-width: 130px;
+.action-bar .grow { flex: 1; }
+
+/* Reader dock. The only things allowed to sit over a song are play/pause and
+   a speed nudge; everything else lives in the tools sheet. It occupies one
+   corner instead of a full-width bar, and fades back a couple of seconds into
+   autoscroll so it stops competing with the chart. */
+.reader-dock {
+  position: fixed; z-index: 20;
+  right: 12px; bottom: calc(12px + var(--safe-bottom));
   display: flex; align-items: center; gap: 8px;
+  transition: opacity 0.35s ease;
 }
-.reader-controls .speed-ctl input[type=range] {
-  flex: 1; min-width: 70px; accent-color: var(--accent);
+.reader-dock.dim { opacity: 0.25; }
+.dock-speed {
+  display: flex; align-items: center;
+  background: var(--glass);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid var(--border); border-radius: 999px;
+  box-shadow: var(--shadow);
 }
-.reader-controls .speed-ctl input[type=number] {
-  width: 3.2em; text-align: center; min-height: 40px;
-  padding: 7px 4px; border-radius: 8px;
-  background: var(--bg3); border: 1px solid var(--border); color: var(--fg);
-  font: 13px var(--mono); -moz-appearance: textfield;
+.dock-speed button {
+  background: none; border: none; cursor: pointer; color: var(--muted);
+  font-size: 17px; line-height: 1; padding: 11px 13px; min-height: 44px;
+  border-radius: 999px;
 }
-.reader-controls .speed-ctl input[type=number]:focus {
-  outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft);
+.dock-speed button:hover { color: var(--fg); }
+.dock-level {
+  font: 13px var(--mono); color: var(--muted);
+  min-width: 18px; text-align: center;
 }
-.reader-controls .speed-ctl input[type=number]::-webkit-outer-spin-button,
-.reader-controls .speed-ctl input[type=number]::-webkit-inner-spin-button {
-  -webkit-appearance: none; margin: 0;
+.reader-dock .btn.play {
+  border-radius: 999px; min-width: 52px; min-height: 52px;
+  font-size: 19px; padding: 0; box-shadow: var(--shadow);
 }
-.reader-controls .btn.play { border-radius: 999px; min-width: 44px; }
-.reader-controls .btn.play.playing {
+.reader-dock .btn.play.playing {
   box-shadow: 0 0 0 4px var(--accent-soft), 0 0 18px -2px var(--accent);
 }
+
+/* Song tools sheet: transpose, font size, speed, and the per-song actions the
+   top bar used to carry. */
+.tools { display: flex; flex-direction: column; gap: 14px; }
+.tool-row { display: flex; align-items: center; gap: 12px; }
+.tool-row.stacked { flex-direction: column; align-items: stretch; gap: 8px; }
+.tool-label { flex: 1; font-size: 14px; color: var(--muted); }
+.tool-row input[type=range] { width: 100%; accent-color: var(--accent); }
+.tool-actions { display: flex; gap: 10px; margin-top: 2px; }
+.tool-actions .btn { flex: 1; }
 /* Setlist: "Next: …" surfaces over the controls at the end of the song. */
 .next-song {
   position: fixed; left: 50%; transform: translateX(-50%);

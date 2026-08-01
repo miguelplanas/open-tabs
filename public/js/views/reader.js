@@ -1,12 +1,15 @@
-import { $app, api, escapeHtml } from '../app.js';
-import { renderBody } from '../chords.js';
-import { addToCollectionDialog } from '../ui.js';
+import { $app, api, escapeHtml, h } from '../app.js';
+import { renderBody, fitChars } from '../chords.js';
+import {
+  addToCollectionDialog, openSheet, versionPickerDialog,
+  groupKey, kindLabel, tuningLabel,
+} from '../ui.js';
 import { enableChordPopovers, hideChordPopover } from '../chord-shapes.js';
 
 // Autoscroll speed is persisted per song in pixels/second, but the reader
-// exposes it as a 1..20 "level": the slider then has a small set of fixed
-// steps and the number field takes a memorable value. Level 1 is a slow
-// crawl, level 20 a brisk 40 px/s; the default is deliberately gentle.
+// exposes it as a 1..20 "level": the dock then has memorable steps and the
+// slider a small set of them. Level 1 is a slow crawl, level 20 a brisk
+// 40 px/s; the default is deliberately gentle.
 const PX_PER_LEVEL = 2;
 const MIN_LEVEL = 1;
 const MAX_LEVEL = 20;
@@ -15,11 +18,22 @@ const levelToSpeed = (lvl) => lvl * PX_PER_LEVEL;
 const speedToLevel = (px) =>
   Math.min(MAX_LEVEL, Math.max(MIN_LEVEL, Math.round(px / PX_PER_LEVEL)));
 
-// Floor for the fit-to-width shrink: fits lines up to ~100 chars on a phone,
-// which covers real chord/lyric charts. It exists so one absurdly long line
-// (a malformed import) can't shrink the whole song to microscopic; such a
-// line falls back to scrolling inside the body instead.
-const MIN_FIT_FONT = 6;
+// Floor for the fit-to-width shrink. Text below this is not readable at
+// arm's length on a music stand, so the fit stops here and the few lines that
+// still overflow scroll sideways instead of shrinking the whole song.
+const MIN_FIT_FONT = 11;
+const MIN_FONT = 9;
+const MAX_FONT = 24;
+
+// The screen stays awake for as long as the reader is open, not only while
+// autoscroll runs: reaching the last line does not mean you stopped playing,
+// and that was exactly when the phone used to lock. Insurance against leaving
+// the app open on the stand: with nothing playing and nothing touched for
+// this long, let the phone sleep.
+const WAKE_IDLE_MS = 20 * 60 * 1000;
+
+// How long the dock stays fully visible after you touch it while playing.
+const DOCK_DIM_MS = 2600;
 
 export async function readerView([id]) {
   let song;
@@ -45,19 +59,27 @@ export async function readerView([id]) {
   let fontSize = Number(localStorage.getItem('opentabs.fontSize')) || 14;
   let playing = false;
   let wakeLock = null;
+  let wakeIdle = null;
+  let dimT = null;
   let raf = null;
   let dirty = false;
+
+  // Width the font is fitted to, in characters: ignores tab staves (they get
+  // their own horizontal scroll) and tolerates the odd over-long line.
+  const bodyText = (song.body || '').replace(/\s+$/, '');
+  const fitTarget = fitChars(bodyText);
+
+  // Other versions of this same song, filled in below. Starts as just this one
+  // so everything can render before the list arrives.
+  let versions = [song];
 
   $app.innerHTML = `
     <header class="topbar">
       <button class="btn icon" id="back" title="Back">←</button>
       <h1>${escapeHtml(song.title)}
-        <span class="sub">${escapeHtml(song.artist)}${
-          song.capo ? ` · capo ${song.capo}` : ''}${
-          song.tuning && song.tuning.toLowerCase() !== 'standard' ? ` · ${escapeHtml(song.tuning)}` : ''}</span>
+        <span class="sub" id="sub"></span>
       </h1>
-      <button class="btn icon" id="add-col" title="Add to collection">📁</button>
-      <button class="btn icon" id="edit" title="Edit">✏️</button>
+      <button class="btn icon" id="tools" title="Song tools" aria-haspopup="dialog">⋯</button>
     </header>
     ${inSetlist ? `
     <div class="setlist-bar">
@@ -79,35 +101,29 @@ export async function readerView([id]) {
     <button class="btn primary next-song" id="next-song" hidden>
       Next: ${escapeHtml(setlist.titles?.[setIdx + 1] || 'next song')} ›
     </button>` : ''}
-    <div class="reader-controls">
-      <button class="btn primary icon play" id="play" title="Autoscroll">▶</button>
-      <div class="speed-ctl" title="Scroll speed">
-        <input type="range" id="speed" min="${MIN_LEVEL}" max="${MAX_LEVEL}" step="1" value="${level}" aria-label="Scroll speed">
-        <input type="number" id="speed-num" min="${MIN_LEVEL}" max="${MAX_LEVEL}" step="1" value="${level}" inputmode="numeric" aria-label="Scroll speed level">
+    <div class="reader-dock" id="dock">
+      <div class="dock-speed">
+        <button id="spd-down" aria-label="Scroll slower">−</button>
+        <span class="dock-level" id="lvl" title="Autoscroll speed" aria-live="polite"></span>
+        <button id="spd-up" aria-label="Scroll faster">+</button>
       </div>
-      <div class="pill" title="Transpose">
-        <button id="tr-down">♭</button><span id="tr-val"></span><button id="tr-up">♯</button>
-      </div>
-      <div class="pill" title="Font size">
-        <button id="fs-down">A-</button><button id="fs-up">A+</button>
-      </div>
+      <button class="btn primary icon play" id="play" title="Autoscroll" aria-label="Start autoscroll">▶</button>
     </div>`;
 
   const $body = document.getElementById('body');
   const $play = document.getElementById('play');
-  const $trVal = document.getElementById('tr-val');
+  const $dock = document.getElementById('dock');
+  const $lvl = document.getElementById('lvl');
+  const $sub = document.getElementById('sub');
   const $progress = document.getElementById('progress');
 
   // In a setlist, surface "Next: …" once the reader hits the end of the song,
   // so advancing never requires scrolling back to the top bar.
   const $next = document.getElementById('next-song');
-  const $controls = document.querySelector('.reader-controls');
-  const $speed = document.getElementById('speed');
-  const $speedNum = document.getElementById('speed-num');
 
   // The scroll position at which the song is "done": the last line has reached
-  // just above the controls bar. Autoscroll and the progress dot both stop
-  // here rather than at the document bottom, so no blank tail scrolls past.
+  // just above the dock. Autoscroll and the progress dot both stop here rather
+  // than at the document bottom, so no blank tail scrolls past.
   let endLimit = Infinity;
 
   function updateProgress() {
@@ -120,16 +136,32 @@ export async function readerView([id]) {
   }
   window.addEventListener('scroll', updateProgress, { passive: true });
 
+  // Width of one monospace character at the current font size, measured with
+  // an off-screen probe. Character counts then predict line widths without a
+  // layout pass, and without being thrown off by the scrollable tab blocks.
+  function charWidth() {
+    const probe = document.createElement('span');
+    probe.textContent = '0'.repeat(50);
+    probe.style.cssText = 'position:absolute;visibility:hidden;white-space:pre;';
+    $body.append(probe);
+    const w = probe.getBoundingClientRect().width / 50;
+    probe.remove();
+    return w;
+  }
+
   function fitWidth() {
-    // Fit the widest line to the viewport so a song never needs sideways
-    // dragging while you play. Only ever shrink from the chosen font size.
+    // Fit the chord and lyric lines to the viewport so a song never needs
+    // sideways dragging while you play. Only ever shrink from the chosen size,
+    // and never past MIN_FIT_FONT.
     $body.style.fontSize = fontSize + 'px';
+    if (!fitTarget) return;
     const cs = getComputedStyle($body);
     const padX = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight);
     const avail = $body.clientWidth - padX;
-    const content = $body.scrollWidth - padX;
-    if (avail > 0 && content > avail) {
-      $body.style.fontSize = Math.max(MIN_FIT_FONT, (fontSize * (avail - 1)) / content) + 'px';
+    const needed = fitTarget * charWidth();
+    if (avail > 0 && needed > avail) {
+      $body.style.fontSize =
+        Math.max(MIN_FIT_FONT, (fontSize * (avail - 1)) / needed) + 'px';
     }
   }
 
@@ -137,16 +169,39 @@ export async function readerView([id]) {
     const cs = getComputedStyle($body);
     const padBottom = parseFloat(cs.paddingBottom) || 0;
     const textBottom = $body.getBoundingClientRect().bottom + window.scrollY - padBottom;
-    const controlsH = $controls ? $controls.offsetHeight : 0;
+    const dockH = $dock.getBoundingClientRect().height + 24; // dock plus its gap
     const docMax = document.documentElement.scrollHeight - window.innerHeight;
-    endLimit = Math.max(0, Math.min(textBottom + controlsH - window.innerHeight, docMax));
+    endLimit = Math.max(0, Math.min(textBottom + dockH - window.innerHeight, docMax));
   }
 
   function render() {
-    // Trim the trailing blank lines so the "last line" autoscroll stops at is
-    // real content, not empty space at the tail of the source text.
-    $body.innerHTML = renderBody((song.body || '').replace(/\s+$/, ''), transpose);
-    $trVal.textContent = transpose > 0 ? '+' + transpose : String(transpose);
+    $body.innerHTML = renderBody(bodyText, transpose);
+    syncMeta();
+  }
+
+  // Title subtitle plus whatever readouts the tools sheet currently has open.
+  // The transpose amount lives in the subtitle now that it is off the dock: it
+  // has to stay visible somewhere, or a song silently reads in the wrong key.
+  function syncMeta() {
+    const bits = [song.artist];
+    if (song.capo) bits.push(`capo ${song.capo}`);
+    const tuning = tuningLabel(song.tuning);
+    if (tuning) bits.push(tuning);
+    // Which version you are reading only matters when there is more than one.
+    if (versions.length > 1) bits.push(kindLabel(song.kind));
+    if (transpose) bits.push(`transpose ${transpose > 0 ? '+' : ''}${transpose}`);
+    $sub.textContent = bits.filter(Boolean).join(' · ');
+
+    $lvl.textContent = String(level);
+    const set = (elId, text) => {
+      const el = document.getElementById(elId);
+      if (el) el.textContent = text;
+    };
+    set('tr-val', transpose > 0 ? '+' + transpose : String(transpose));
+    set('fs-val', String(fontSize));
+    set('sp-val', '· level ' + level);
+    const slider = document.getElementById('sheet-speed');
+    if (slider && slider !== document.activeElement) slider.value = String(level);
   }
 
   function relayout() {
@@ -160,44 +215,140 @@ export async function readerView([id]) {
   window.addEventListener('resize', relayout);
   enableChordPopovers($body); // tap a chord to see its fingering
 
+  // Sibling versions of this song. Filtered from the whole library list rather
+  // than fetched with ?q=: the plain /songs url is the one the service worker
+  // caches, so switching version keeps working with no signal.
+  api('/songs')
+    .then((rows) => {
+      const mine = rows.filter((r) => groupKey(r) === groupKey(song));
+      if (mine.length > 1) {
+        versions = mine;
+        syncMeta();
+      }
+    })
+    .catch(() => { /* the selector simply stays hidden */ });
+
   document.getElementById('back').onclick = () => (location.hash = backHash);
-  document.getElementById('edit').onclick = () => (location.hash = '#/edit/' + song.id);
-  document.getElementById('add-col').onclick = () => addToCollectionDialog(song);
   if (inSetlist) {
     const goTo = (i) => { if (i >= 0 && i < setlist.ids.length) location.hash = '#/song/' + setlist.ids[i]; };
     document.getElementById('prev').onclick = () => goTo(setIdx - 1);
     document.getElementById('next').onclick = () => goTo(setIdx + 1);
     if ($next) $next.onclick = () => goTo(setIdx + 1);
   }
-  document.getElementById('tr-up').onclick = () => { transpose = Math.min(11, transpose + 1); dirty = true; render(); relayout(); };
-  document.getElementById('tr-down').onclick = () => { transpose = Math.max(-11, transpose - 1); dirty = true; render(); relayout(); };
-  document.getElementById('fs-up').onclick = () => { fontSize = Math.min(24, fontSize + 1); save(); relayout(); };
-  document.getElementById('fs-down').onclick = () => { fontSize = Math.max(9, fontSize - 1); save(); relayout(); };
 
-  // Slider (fixed 1..20 steps) and number field are two views of one level;
-  // whichever the user touches, the other follows.
-  function setLevel(next, from) {
-    level = Math.min(MAX_LEVEL, Math.max(MIN_LEVEL, Math.round(next) || MIN_LEVEL));
-    speed = levelToSpeed(level);
-    if (from !== 'range') $speed.value = String(level);
-    if (from !== 'num') $speedNum.value = String(level);
+  function setTranspose(n) {
+    transpose = Math.min(11, Math.max(-11, n));
     dirty = true;
+    render();
+    relayout();
   }
-  $speed.oninput = (e) => setLevel(Number(e.target.value), 'range');
-  $speedNum.oninput = (e) => { if (e.target.value.trim() !== '') setLevel(Number(e.target.value), 'num'); };
-  $speedNum.onchange = () => { $speedNum.value = String(level); }; // normalize on blur/enter
-  function save() { localStorage.setItem('opentabs.fontSize', String(fontSize)); }
 
-  async function setWakeLock(on) {
-    try {
-      if (on && 'wakeLock' in navigator) {
-        wakeLock = await navigator.wakeLock.request('screen');
-      } else if (wakeLock) {
-        await wakeLock.release();
-        wakeLock = null;
-      }
-    } catch { /* wake lock is best-effort */ }
+  function setFont(n) {
+    fontSize = Math.min(MAX_FONT, Math.max(MIN_FONT, n));
+    localStorage.setItem('opentabs.fontSize', String(fontSize));
+    relayout();
+    syncMeta();
   }
+
+  function setLevel(n) {
+    level = Math.min(MAX_LEVEL, Math.max(MIN_LEVEL, Math.round(n) || MIN_LEVEL));
+    speed = levelToSpeed(level);
+    dirty = true;
+    syncMeta();
+  }
+
+  document.getElementById('spd-down').onclick = () => setLevel(level - 1);
+  document.getElementById('spd-up').onclick = () => setLevel(level + 1);
+
+  // Everything that is not "play" or "nudge the speed" lives in a sheet: on a
+  // phone the dock has to stay out of the way of the song.
+  function openTools() {
+    const el = h(`
+      <div class="tools">
+        ${versions.length > 1 ? `
+        <div class="tool-row">
+          <span class="tool-label">Version</span>
+          <button class="btn" id="ver-btn">${escapeHtml(kindLabel(song.kind))} ▾</button>
+        </div>` : ''}
+        <div class="tool-row">
+          <span class="tool-label">Transpose</span>
+          <div class="pill">
+            <button id="tr-down" aria-label="Transpose down">♭</button>
+            <span id="tr-val"></span>
+            <button id="tr-up" aria-label="Transpose up">♯</button>
+          </div>
+        </div>
+        <div class="tool-row">
+          <span class="tool-label">Font size</span>
+          <div class="pill">
+            <button id="fs-down" aria-label="Smaller text">A-</button>
+            <span id="fs-val"></span>
+            <button id="fs-up" aria-label="Bigger text">A+</button>
+          </div>
+        </div>
+        <div class="tool-row stacked">
+          <span class="tool-label">Autoscroll speed <span class="count" id="sp-val"></span></span>
+          <input type="range" id="sheet-speed" min="${MIN_LEVEL}" max="${MAX_LEVEL}"
+                 step="1" value="${level}" aria-label="Autoscroll speed">
+        </div>
+        <div class="tool-actions">
+          <button class="btn" id="t-collection">Add to collection</button>
+          <button class="btn" id="t-edit">Edit song</button>
+        </div>
+      </div>`);
+    const sheet = openSheet(el);
+    const $ver = el.querySelector('#ver-btn');
+    if ($ver) {
+      $ver.onclick = () => {
+        sheet.close();
+        versionPickerDialog(versions, { currentId: song.id });
+      };
+    }
+    el.querySelector('#tr-down').onclick = () => setTranspose(transpose - 1);
+    el.querySelector('#tr-up').onclick = () => setTranspose(transpose + 1);
+    el.querySelector('#fs-down').onclick = () => setFont(fontSize - 1);
+    el.querySelector('#fs-up').onclick = () => setFont(fontSize + 1);
+    el.querySelector('#sheet-speed').oninput = (e) => setLevel(Number(e.target.value));
+    el.querySelector('#t-collection').onclick = () => { sheet.close(); addToCollectionDialog(song); };
+    el.querySelector('#t-edit').onclick = () => { sheet.close(); location.hash = '#/edit/' + song.id; };
+    syncMeta();
+  }
+  document.getElementById('tools').onclick = openTools;
+
+  async function acquireWake() {
+    if (wakeLock || !('wakeLock' in navigator) || document.visibilityState !== 'visible') return;
+    try {
+      wakeLock = await navigator.wakeLock.request('screen');
+      // The browser drops the lock whenever the page is hidden; forget it so
+      // the next visibilitychange requests a fresh one.
+      wakeLock.addEventListener?.('release', () => { wakeLock = null; });
+    } catch {
+      wakeLock = null; // wake lock is best-effort
+    }
+  }
+
+  function releaseWake() {
+    const lock = wakeLock;
+    wakeLock = null;
+    lock?.release?.().catch(() => {});
+  }
+
+  function keepAwake() {
+    acquireWake();
+    clearTimeout(wakeIdle);
+    wakeIdle = setTimeout(() => { if (!playing) releaseWake(); }, WAKE_IDLE_MS);
+  }
+
+  // Fade the dock down while autoscroll runs, back up on any touch: it sits
+  // over the song, so it should only be as present as it needs to be.
+  function pokeDock() {
+    $dock.classList.remove('dim');
+    clearTimeout(dimT);
+    if (playing) dimT = setTimeout(() => $dock.classList.add('dim'), DOCK_DIM_MS);
+  }
+
+  const onPoke = () => { pokeDock(); keepAwake(); };
+  document.addEventListener('pointerdown', onPoke);
 
   let acc = 0, last = 0;
   function step(ts) {
@@ -225,17 +376,21 @@ export async function readerView([id]) {
     playing = on;
     $play.textContent = playing ? '⏸' : '▶';
     $play.classList.toggle('playing', playing);
+    $play.setAttribute('aria-label', playing ? 'Pause autoscroll' : 'Start autoscroll');
     last = 0; acc = 0;
     if (playing) raf = requestAnimationFrame(step);
     else if (raf) cancelAnimationFrame(raf);
-    setWakeLock(playing);
+    // The screen is kept awake either way: stopping at the last line is not a
+    // reason to let the phone lock on you mid-song.
+    keepAwake();
+    pokeDock();
   }
   $play.onclick = () => toggle();
 
   // Double-tap the tab body to toggle autoscroll: much easier than the play
   // button with a guitar in hand. Manual detection, since dblclick is
   // unreliable in the iOS standalone PWA; scroll gestures and taps on chords
-  // (reserved for future use) don't count.
+  // (which open the fingering popover) don't count.
   let tapT = 0, tapX = 0, tapY = 0, tapMoved = false, downX = 0, downY = 0;
   $body.addEventListener('pointerdown', (e) => {
     tapMoved = false;
@@ -280,7 +435,7 @@ export async function readerView([id]) {
   }
 
   const onVis = () => {
-    if (document.visibilityState === 'visible' && playing) setWakeLock(true);
+    if (document.visibilityState === 'visible') keepAwake();
     if (document.visibilityState === 'hidden') {
       last = 0; // don't count hidden time toward autoscroll
       flushSettings();
@@ -288,6 +443,8 @@ export async function readerView([id]) {
   };
   document.addEventListener('visibilitychange', onVis);
   window.addEventListener('pagehide', flushSettings);
+
+  keepAwake();
 
   // Persist played_at; fire-and-forget.
   api(`/songs/${id}/played`, { method: 'POST', body: {} }).catch(() => {});
@@ -297,10 +454,13 @@ export async function readerView([id]) {
     window.removeEventListener('scroll', updateProgress);
     window.removeEventListener('resize', relayout);
     document.removeEventListener('keydown', onKey);
+    document.removeEventListener('pointerdown', onPoke);
     document.removeEventListener('visibilitychange', onVis);
     window.removeEventListener('pagehide', flushSettings);
     if (raf) cancelAnimationFrame(raf);
-    setWakeLock(false);
+    clearTimeout(wakeIdle);
+    clearTimeout(dimT);
+    releaseWake();
     flushSettings();
   };
 }

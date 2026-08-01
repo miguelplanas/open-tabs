@@ -29,7 +29,7 @@ export async function previewView() {
     <div class="notice" id="dupe" hidden></div>
     <pre class="tabbody" id="body"></pre>
     <div class="preview-pad"></div>
-    <div class="reader-controls">
+    <div class="action-bar">
       <button class="btn" id="edit">Edit first</button>
       <button class="btn primary grow" id="save">Save to library</button>
     </div>`;

@@ -59,8 +59,30 @@ const routes = [
 let teardown = null;
 let navSeq = 0;
 
+// List views remember where you left them: opening a song from halfway down
+// the library and coming back should not dump you at the top of the list
+// again. Keyed by hash, so every collection keeps its own place. The reader is
+// deliberately not in this set: a song always opens on its first line.
+const KEEPS_SCROLL = /^#?\/?$|^#\/collections$|^#\/collection\/\d+$|^#\/search$/;
+const scrollMemo = new Map();
+let lastHash = null;
+
+// Replacing #app's innerHTML collapses the document height, so the browser's
+// own restoration has nothing to aim at; we do it ourselves after the view
+// has painted.
+if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
+
+function restoreScroll(hash, seq) {
+  const y = KEEPS_SCROLL.test(hash) ? scrollMemo.get(hash) || 0 : 0;
+  window.scrollTo(0, y);
+  // A view can still be growing on the frame it returns (late list rows, the
+  // reader's font fitting), so aim once more once layout settles.
+  if (y) requestAnimationFrame(() => { if (seq === navSeq) window.scrollTo(0, y); });
+}
+
 async function route() {
   const my = ++navSeq;
+  if (lastHash && KEEPS_SCROLL.test(lastHash)) scrollMemo.set(lastHash, window.scrollY);
   if (typeof teardown === 'function') teardown();
   teardown = null;
   const hash = location.hash || '#/';
@@ -76,6 +98,8 @@ async function route() {
         return;
       }
       teardown = td;
+      lastHash = hash;
+      restoreScroll(hash, my);
       return;
     }
   }

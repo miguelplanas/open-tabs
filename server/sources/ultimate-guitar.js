@@ -58,7 +58,13 @@ function cleanBody(content) {
 }
 
 export async function fetchTab(url) {
-  const store = await fetchStore(url);
+  return parseTab(await fetchStore(url), url);
+}
+
+// Split out from fetchTab so the account importer (scripts/import-ug.js) can
+// fetch pages with a session cookie of its own and still parse them exactly
+// the way the app does.
+export function parseTab(store, url) {
   const data = store?.store?.page?.data;
   const tab = data?.tab || {};
   const content = data?.tab_view?.wiki_tab?.content;

@@ -8,8 +8,11 @@ anywhere. Built as a personal alternative to Ultimate Guitar.
 
 - **Library** with instant search (title, artist), sorted by recently played.
 - **Reader** optimized for phones: chord highlighting, autoscroll with per-song
-  speed, transpose (persisted per song), capo/tuning display, font size control,
-  screen wake lock so the phone doesn't sleep mid-song.
+  speed, and a corner dock that keeps play/pause and speed within thumb reach
+  while staying out of the chart's way. Transpose, font size and per-song
+  actions live in a tools sheet. Text is fitted to the screen width (wide ASCII
+  staves scroll on their own instead of shrinking the song), and the screen
+  stays awake for as long as a song is open, not just while autoscroll runs.
 - **Editor**: plain monospace text (paste straight from Ultimate Guitar; `[ch]`
   and `[tab]` markers are cleaned on import), live preview.
 - **Search online**: pluggable tab sources. Ships with an Ultimate Guitar
@@ -37,9 +40,10 @@ erDiagram
         TEXT title "NOT NULL"
         TEXT artist "default ''"
         TEXT body "monospace tab/chords, default ''"
+        TEXT kind "chords|tabs|lyrics, derived from body"
         INTEGER capo "default 0"
         TEXT tuning "default ''"
-        REAL scroll_speed "default 20"
+        REAL scroll_speed "default 6"
         INTEGER transpose "semitones, default 0"
         TEXT source "provider id, default ''"
         TEXT source_url "default ''"
@@ -94,6 +98,55 @@ OPENTABS_PASSWORD=mysecret docker compose up --build
 
 Songs are stored in `./data/opentabs.db`. Back that file up and you've backed
 up everything. To migrate hosts, copy the file and start the container there.
+
+## Self-host it (Proxmox LXC)
+
+Run it as a plain Node process under systemd in a Debian LXC. Docker inside an
+unprivileged container needs nesting plus keyctl and a degraded storage driver,
+which buys nothing here: the app is one process and one file.
+
+```bash
+# In the container (2 vCPU / 1 GB RAM is generous)
+apt install -y nodejs npm curl          # curl is required by the tab sources
+adduser --system --group opentabs
+install -d -o opentabs -g opentabs /var/lib/opentabs
+git clone <repo> /opt/opentabs && cd /opt/opentabs && npm ci --omit=dev
+
+cp deploy/opentabs.service deploy/opentabs-backup.{service,timer} /etc/systemd/system/
+printf 'OPENTABS_PASSWORD=%s\n' "$(openssl rand -base64 24)" > /etc/opentabs.env
+chmod 600 /etc/opentabs.env
+systemctl enable --now opentabs opentabs-backup.timer
+```
+
+Bring an existing library across with a verified copy rather than `cp`:
+
+```bash
+node scripts/backup-db.js                      # on the old host
+scp data/backups/opentabs-*.db root@lxc:/var/lib/opentabs/opentabs.db
+chown opentabs:opentabs /var/lib/opentabs/opentabs.db
+```
+
+`GET /healthz` answers `{"ok":true,"songs":N}` and touches the database, so it
+fails when the file is missing or unreadable rather than only when the process
+dies. Point Uptime Kuma or `systemd` at it.
+
+For TLS, put Caddy in front of it or, simpler for a personal library, run
+Tailscale in the container and `tailscale serve --bg --https=443 localhost:3000`.
+That gives a real certificate with no port forwarding and no public exposure,
+and HTTPS is required anyway: the screen wake lock and the service worker only
+exist in a secure context.
+
+### Backups
+
+`node scripts/backup-db.js` writes a dated, self-contained copy and reads it
+back to check it (`integrity_check` plus a row count against the live
+database), keeping the newest 14. It uses `VACUUM INTO`, so it is safe while
+the app is running, unlike `cp` on a WAL database, and the output file is
+restored by renaming it over `opentabs.db`.
+
+The timer keeps copies on the same disk, which only covers mistakes, not a dead
+disk. Add one line to push them elsewhere (`restic`, `rsync`, or a Proxmox
+Backup Server job on the container) and the library is genuinely safe.
 
 ## Use it on iPhone
 

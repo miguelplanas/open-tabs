@@ -1,0 +1,28 @@
+# Nightly database backup. Paired with opentabs-backup.timer.
+#
+#   cp deploy/opentabs-backup.{service,timer} /etc/systemd/system/
+#   systemctl enable --now opentabs-backup.timer
+#   systemctl start opentabs-backup   # run one now and check the output
+
+[Unit]
+Description=Back up the OpenTabs database
+Documentation=https://github.com/mplanas/open-tabs
+# Not After=opentabs.service on purpose: VACUUM INTO is safe against a live
+# writer, so the backup neither needs nor waits for the app to be down.
+
+[Service]
+Type=oneshot
+User=opentabs
+Group=opentabs
+WorkingDirectory=/opt/opentabs
+ExecStart=/usr/bin/node scripts/backup-db.js
+
+Environment=OPENTABS_DB=/var/lib/opentabs/opentabs.db
+Environment=OPENTABS_BACKUP_DIR=/var/lib/opentabs/backups
+Environment=OPENTABS_BACKUP_KEEP=14
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/opentabs

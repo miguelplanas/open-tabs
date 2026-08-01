@@ -1,0 +1,12 @@
+[Unit]
+Description=Nightly OpenTabs database backup
+
+[Timer]
+OnCalendar=*-*-* 04:00:00
+# A homelab box is not always awake at 4am. Persistent catches up on the next
+# boot instead of silently skipping a night.
+Persistent=true
+RandomizedDelaySec=15m
+
+[Install]
+WantedBy=timers.target

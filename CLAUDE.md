@@ -10,6 +10,8 @@ Owner uses it primarily on iPhone as an installed PWA; laptop secondary.
 - SQLite file lives at `OPENTABS_DB` (default `data/opentabs.db`). Tables: `songs`, `collections`, the `collection_songs` join table (ordered many-to-many; `foreign_keys` pragma is ON for cascade deletes), and `sessions` for auth. Collections (folders/albums/setlists) live in `server/collections.js` under `/api/collections`.
 - Auth: single password via `OPENTABS_PASSWORD` env var; login mints a random token stored in the `sessions` table and set as an httpOnly cookie (`server/auth.js`). Auth is disabled when the var is unset (local dev).
 - Tab sources (online search/import) are pluggable providers in `server/sources/`; contract documented in `server/sources/provider.md`. The frontend discovers providers via `GET /api/sources`, so new providers need no frontend changes.
+- `songs.kind` (`chords`/`tabs`/`lyrics`) is derived from the body by `detectKind()` on every write in `server/songs.js`, never accepted from the client. The library groups rows with the same normalized title + artist into one song with several versions; the grouping is computed at render time and never stored.
+- `scripts/` holds one-off account tools that are not part of the app: `import-ug.js` restores an Ultimate Guitar account (lists and playlists become collections), `ug-probe.js` inspects a logged-in UG page, `ug-lib.js` is their shared fetch plumbing. They read a session cookie from `~/.ug-cookie` and never take it as a command-line argument.
 
 ## Conventions
 

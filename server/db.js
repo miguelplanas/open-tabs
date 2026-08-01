@@ -2,6 +2,9 @@ import Database from 'better-sqlite3';
 import { mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+// chords.js is pure and touches no DOM at module load, so the server can reuse
+// the frontend's classifier instead of keeping a second copy of it in sync.
+import { detectKind } from '../public/js/chords.js';
 
 // Resolve paths against the project root so the app works from any CWD.
 export const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -38,6 +41,10 @@ db.exec(`
     transpose INTEGER NOT NULL DEFAULT 0,
     source TEXT NOT NULL DEFAULT '',
     source_url TEXT NOT NULL DEFAULT '',
+    -- 'chords', 'tabs' or 'lyrics', derived from the body on every write
+    -- (server/songs.js). Lets the library label the versions of a song
+    -- without loading any bodies.
+    kind TEXT NOT NULL DEFAULT '',
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at TEXT NOT NULL DEFAULT (datetime('now')),
     played_at TEXT
@@ -75,6 +82,20 @@ db.exec(`
 // removed. Guarded so it's a no-op on fresh databases (which never have it).
 const songCols = db.prepare('PRAGMA table_info(songs)').all().map((c) => c.name);
 if (songCols.includes('tags')) db.exec('ALTER TABLE songs DROP COLUMN tags');
+if (!songCols.includes('kind')) {
+  db.exec("ALTER TABLE songs ADD COLUMN kind TEXT NOT NULL DEFAULT ''");
+}
+
+// Backfill `kind` for anything written before the column existed (or imported
+// straight into the database by scripts/import-ug.js). Only touches rows that
+// have never been classified, so it is a no-op on every later startup.
+const unclassified = db.prepare("SELECT id, body FROM songs WHERE kind = ''").all();
+if (unclassified.length) {
+  const setKind = db.prepare('UPDATE songs SET kind = ? WHERE id = ?');
+  db.transaction(() => {
+    for (const s of unclassified) setKind.run(detectKind(s.body), s.id);
+  })();
+}
 
 // One-time: bring songs still sitting on the old 20 px/s default down to the
 // gentler baseline. Guarded by user_version so a speed the owner deliberately

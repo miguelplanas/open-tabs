@@ -22,6 +22,127 @@ export function toast(message, { danger = false, duration = 3200 } = {}) {
   }, duration);
 }
 
+// --- Song versions -------------------------------------------------------
+// Several rows in `songs` are often the same song: a chord sheet and a tab
+// arrangement, or two transcriptions of different quality. They are grouped for
+// display by normalized title and artist (the same normalization as norm() in
+// server/db.js). Nothing about the grouping is stored, so it recomputes itself
+// whenever songs are imported, edited or deleted.
+
+export const normalizeName = (s) =>
+  String(s ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase();
+
+export const groupKey = (song) =>
+  `${normalizeName(song.title)}|${normalizeName(song.artist)}`;
+
+// Group a list of songs, keeping both the order the groups first appear in and
+// the order of versions within each group. The server already sorts by
+// played_at then updated_at, so the first version of a group is the one you
+// reached for most recently: the right one to represent it.
+export function groupVersions(songs) {
+  const groups = new Map();
+  for (const s of songs) {
+    const key = groupKey(s);
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(s);
+  }
+  return [...groups.values()];
+}
+
+const KIND_LABELS = { tabs: 'Tabs', chords: 'Chords', lyrics: 'Lyrics' };
+export const kindLabel = (kind) => KIND_LABELS[kind] || 'Tab';
+
+// Ultimate Guitar spells standard tuning out in full, so both forms mean the
+// same thing: nothing worth taking up space with.
+const STANDARD_TUNINGS = new Set(['', 'standard', 'e a d g b e', 'eadgbe']);
+export function tuningLabel(tuning) {
+  const t = String(tuning ?? '').trim();
+  return STANDARD_TUNINGS.has(t.toLowerCase()) ? '' : t;
+}
+
+// How one version reads in the picker: "Chords · capo 2 · Drop D".
+export function versionLabel(song) {
+  const bits = [kindLabel(song.kind)];
+  if (song.capo) bits.push(`capo ${song.capo}`);
+  const tuning = tuningLabel(song.tuning);
+  if (tuning) bits.push(tuning);
+  return bits.join(' · ');
+}
+
+// Choose which version of a song to open. Shared by the library (tapping a
+// song that has more than one) and the reader (switching without going back).
+// Needs only list columns, so it never loads a tab body.
+export function versionPickerDialog(versions, { currentId = null } = {}) {
+  const top = versions[0];
+  const overlay = h(`
+    <div class="confirm-overlay">
+      <div class="confirm-box picker" role="dialog" aria-modal="true">
+        <p>${escapeHtml(top.title)}<span class="count"> · ${
+          escapeHtml(top.artist || 'Unknown artist')}</span></p>
+        <ul class="picker-list" id="vp-list"></ul>
+        <div class="confirm-actions">
+          <button type="button" class="btn" id="vp-close">Cancel</button>
+        </div>
+      </div>
+    </div>`);
+  document.body.append(overlay);
+  requestAnimationFrame(() => overlay.classList.add('show'));
+
+  function close() {
+    document.removeEventListener('keydown', onKey);
+    overlay.classList.remove('show');
+    const remove = () => overlay.remove();
+    overlay.addEventListener('transitionend', remove, { once: true });
+    setTimeout(remove, 400);
+  }
+  function onKey(e) { if (e.key === 'Escape') close(); }
+  document.addEventListener('keydown', onKey);
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+  overlay.querySelector('#vp-close').onclick = close;
+
+  const list = overlay.querySelector('#vp-list');
+  for (const v of versions) {
+    const current = v.id === currentId;
+    const row = h(`
+      <li class="picker-row${current ? ' member' : ''}">
+        <span class="picker-name">${escapeHtml(versionLabel(v))}</span>
+        ${current ? '<span class="picker-check">✓</span>' : ''}
+      </li>`);
+    row.onclick = () => {
+      close();
+      if (!current) location.hash = '#/song/' + v.id;
+    };
+    list.append(row);
+  }
+  return { close };
+}
+
+// Bottom sheet built around a caller-supplied element. Same visual language as
+// the dialogs (scrim plus slide-up card) but it stays open and hands back a
+// close(), so callers can host live controls that keep acting on the view
+// behind it. Used by the reader's song tools.
+export function openSheet(content) {
+  const overlay = h(`
+    <div class="confirm-overlay">
+      <div class="confirm-box sheet" role="dialog" aria-modal="true"></div>
+    </div>`);
+  overlay.firstElementChild.append(content);
+  document.body.append(overlay);
+  requestAnimationFrame(() => overlay.classList.add('show'));
+
+  function close() {
+    document.removeEventListener('keydown', onKey);
+    overlay.classList.remove('show');
+    const remove = () => overlay.remove();
+    overlay.addEventListener('transitionend', remove, { once: true });
+    setTimeout(remove, 400);
+  }
+  function onKey(e) { if (e.key === 'Escape') close(); }
+  document.addEventListener('keydown', onKey);
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+  return { close };
+}
+
 // Promise-based text prompt matching the app's visual language. Resolves to the
 // entered string (trimmed) or null if cancelled.
 export function promptDialog(message, {

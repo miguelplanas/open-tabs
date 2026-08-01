@@ -1,5 +1,5 @@
 import { $app, api, h, escapeHtml, debounce } from '../app.js';
-import { segmentNav } from '../ui.js';
+import { segmentNav, groupVersions, versionPickerDialog } from '../ui.js';
 
 const PREFS_KEY = 'opentabs.libraryPrefs';
 
@@ -55,11 +55,16 @@ export async function libraryView() {
   }
 
   function render() {
-    let songs = all;
+    // One row per song, not per row in the database: the versions of a song
+    // (a chord sheet and a tab of it, two transcriptions) collapse into one
+    // entry. Sorting and artist grouping act on each group's representative,
+    // which is the version the server put first, so the most recently played
+    // or edited one speaks for the group.
+    let groups = groupVersions(all);
     const cmp = SORTS[$sort.value].cmp;
-    if (cmp) songs = [...songs].sort(cmp);
+    if (cmp) groups = [...groups].sort((a, b) => cmp(a[0], b[0]));
 
-    if (songs.length === 0) {
+    if (groups.length === 0) {
       $list.innerHTML = `<li class="empty"><div class="strings"></div>${
         $q.value ? 'No songs match.' : 'Your library is empty.<br>Add a song, or search online to import one.'
       }</li>`;
@@ -69,17 +74,17 @@ export async function libraryView() {
     $list.innerHTML = '';
     if (grouped) {
       const byArtist = new Map();
-      for (const s of songs) {
-        const key = s.artist || 'Unknown artist';
+      for (const g of groups) {
+        const key = g[0].artist || 'Unknown artist';
         if (!byArtist.has(key)) byArtist.set(key, []);
-        byArtist.get(key).push(s);
+        byArtist.get(key).push(g);
       }
       for (const artist of [...byArtist.keys()].sort((a, b) => a.localeCompare(b))) {
         $list.append(h(`<li class="group-header">${escapeHtml(artist)}</li>`));
-        for (const s of byArtist.get(artist)) $list.append(songItem(s, true));
+        for (const g of byArtist.get(artist)) $list.append(songItem(g, true));
       }
     } else {
-      for (const s of songs) $list.append(songItem(s, false));
+      for (const g of groups) $list.append(songItem(g, false));
     }
   }
 
@@ -93,7 +98,8 @@ export async function libraryView() {
       all = await api(q ? '/songs?q=' + encodeURIComponent(q) : '/songs');
       if (my !== gen) return; // a newer search superseded this response
       if (!$q.value.trim()) {
-        const n = all.length;
+        // Songs, not rows: a song with three versions counts once.
+        const n = groupVersions(all).length;
         document.getElementById('count').textContent =
           n > 0 ? `· ${n} ${n === 1 ? 'song' : 'songs'}` : '';
       }
@@ -120,12 +126,21 @@ export async function libraryView() {
   return () => debouncedLoad.cancel();
 }
 
-function songItem(s, hideArtist) {
-  return h(`
-    <li><a href="#/song/${s.id}">
+// `versions` is a group: one song, one or more rows. A single version behaves
+// exactly as before (a plain link); several open the picker instead, so the
+// choice of version happens before the reader, not inside it.
+function songItem(versions, hideArtist) {
+  const s = versions[0];
+  const many = versions.length > 1;
+  const li = h(`
+    <li><a href="${many ? 'javascript:void 0' : '#/song/' + s.id}">
       <div class="title">${escapeHtml(s.title)}${
-        s.capo ? `<span class="badge">capo ${s.capo}</span>` : ''
-      }${s.source ? `<span class="badge">${escapeHtml(s.source)}</span>` : ''}</div>
+        many
+          ? `<span class="badge">${versions.length} versions</span>`
+          : s.capo ? `<span class="badge">capo ${s.capo}</span>` : ''
+      }</div>
       ${hideArtist ? '' : `<div class="meta">${escapeHtml(s.artist || 'Unknown artist')}</div>`}
     </a></li>`);
+  if (many) li.querySelector('a').onclick = () => versionPickerDialog(versions);
+  return li;
 }

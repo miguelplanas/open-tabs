@@ -1,5 +1,5 @@
 import { $app, api, h, escapeHtml } from '../app.js';
-import { promptDialog, confirmDialog, toast } from '../ui.js';
+import { promptDialog, confirmDialog, toast, onLongPress, songActionsSheet } from '../ui.js';
 
 const SETLIST_KEY = 'opentabs.setlist';
 
@@ -76,6 +76,12 @@ export async function collectionView([id]) {
         </li>`);
       if (!editing) {
         li.querySelector('a').onclick = () => saveSetlist();
+        // Reorder mode has its own per-row buttons, so the held-row menu is
+        // only offered when the list is in its normal reading state.
+        onLongPress(li.querySelector('a'), () => songActionsSheet([s], {
+          extra: [{ label: 'Remove from this collection', onSelect: () => removeFromCollection(s.id) }],
+          onDeleted: () => dropSong(s.id),
+        }));
       } else {
         li.querySelector('a').onclick = (e) => e.preventDefault();
         for (const btn of li.querySelectorAll('.reorder')) {
@@ -95,17 +101,27 @@ export async function collectionView([id]) {
     }));
   }
 
+  // The song stays in the library, it just leaves this collection.
+  async function removeFromCollection(songId) {
+    try {
+      await api(`/collections/${col.id}/songs/${songId}`, { method: 'DELETE' });
+      dropSong(songId);
+    } catch (err) {
+      if (err.message !== 'unauthorized') toast('Failed: ' + err.message, { danger: true });
+    }
+  }
+
+  // Forget a song that is no longer part of this list, whether it was removed
+  // from the collection or deleted outright.
+  function dropSong(songId) {
+    col.songs = col.songs.filter((s) => s.id !== songId);
+    renderHeader();
+    renderList();
+  }
+
   async function handleRowAction(act, i) {
     if (act === 'remove') {
-      const s = col.songs[i];
-      try {
-        await api(`/collections/${col.id}/songs/${s.id}`, { method: 'DELETE' });
-        col.songs.splice(i, 1);
-        renderHeader();
-        renderList();
-      } catch (err) {
-        if (err.message !== 'unauthorized') toast('Failed: ' + err.message, { danger: true });
-      }
+      await removeFromCollection(col.songs[i].id);
       return;
     }
     const j = act === 'up' ? i - 1 : i + 1;

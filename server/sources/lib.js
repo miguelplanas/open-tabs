@@ -10,35 +10,38 @@ const UA =
   '(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36';
 
 // PHP's htmlspecialchars/htmlentities (what these sites' templating uses)
-// escapes accented letters as named entities, e.g. Garc&iacute;a. This table
-// covers the Latin-1 letters that show up in Spanish/Portuguese/European
-// titles and artists; numeric entities (&#225; / &#x00e1;) are decoded
+// escapes anything outside ASCII as a named entity, e.g. Garc&iacute;a or
+// &iquest;adonde vas?. Numeric entities (&#225; / &#x00e1;) are decoded
 // generically below.
-const NAMED_ENTITIES = {
-  aacute: 'á', Aacute: 'Á',
-  eacute: 'é', Eacute: 'É',
-  iacute: 'í', Iacute: 'Í',
-  oacute: 'ó', Oacute: 'Ó',
-  uacute: 'ú', Uacute: 'Ú',
-  ntilde: 'ñ', Ntilde: 'Ñ',
-  atilde: 'ã', Atilde: 'Ã',
-  otilde: 'õ', Otilde: 'Õ',
-  acirc: 'â', Acirc: 'Â',
-  ecirc: 'ê', Ecirc: 'Ê',
-  ocirc: 'ô', Ocirc: 'Ô',
-  uuml: 'ü', Uuml: 'Ü',
-  agrave: 'à', Agrave: 'À',
-  egrave: 'è', Egrave: 'È',
-  igrave: 'ì', Igrave: 'Ì',
-  ograve: 'ò', Ograve: 'Ò',
-  ugrave: 'ù', Ugrave: 'Ù',
-  ccedil: 'ç', Ccedil: 'Ç',
+//
+// The names for the whole Latin-1 block are fixed by HTML4 and run in code
+// point order from 160 to 255, so listing them in that order is both shorter
+// and less error-prone than writing out 96 key/value pairs: an omission here
+// is invisible until some song shows raw "&iquest;" in the middle of a lyric.
+const LATIN1_NAMES = (
+  'nbsp iexcl cent pound curren yen brvbar sect uml copy ordf laquo not shy reg macr ' +
+  'deg plusmn sup2 sup3 acute micro para middot cedil sup1 ordm raquo frac14 frac12 frac34 iquest ' +
+  'Agrave Aacute Acirc Atilde Auml Aring AElig Ccedil Egrave Eacute Ecirc Euml Igrave Iacute Icirc Iuml ' +
+  'ETH Ntilde Ograve Oacute Ocirc Otilde Ouml times Oslash Ugrave Uacute Ucirc Uuml Yacute THORN szlig ' +
+  'agrave aacute acirc atilde auml aring aelig ccedil egrave eacute ecirc euml igrave iacute icirc iuml ' +
+  'eth ntilde ograve oacute ocirc otilde ouml divide oslash ugrave uacute ucirc uuml yacute thorn yuml'
+).split(' ');
+
+const NAMED_ENTITIES = Object.fromEntries(
+  LATIN1_NAMES.map((name, i) => [name, String.fromCharCode(160 + i)])
+);
+
+// Punctuation from outside Latin-1 that these sites also emit, plus one
+// override: a non-breaking space becomes an ordinary one, because in a tab
+// body every column has to be a column the chord above can line up with.
+Object.assign(NAMED_ENTITIES, {
   nbsp: ' ',
   hellip: '…',
   ndash: '–', mdash: '—',
   lsquo: '‘', rsquo: '’',
   ldquo: '“', rdquo: '”',
-};
+  bull: '•', dagger: '†', euro: '€', trade: '™',
+});
 
 export function decodeEntities(s) {
   return s

@@ -49,11 +49,22 @@ export async function search(q) {
 
 // UG marks up chords as [ch]Am[/ch] and tab blocks as [tab]...[/tab];
 // strip the markers but keep the text so the body stays plain monospace.
-function cleanBody(content) {
-  return content
+//
+// The entity decoding matters more than it looks. UG's JSON escapes the tab
+// text a second time, so a Spanish lyric arrives as "&iquest;adonde vas?".
+// Left encoded it is not just ugly: the line is seven columns longer than the
+// text it represents, which drags every chord above it out of alignment.
+export function cleanBody(content) {
+  return decodeEntities(content)
     .replaceAll(/\[\/?ch\]/g, '')
     .replaceAll(/\[\/?tab\]/g, '')
     .replaceAll('\r\n', '\n')
+    // U+2028 and U+2029 (shipped as &#8232;) are Unicode line separators.
+    // Some browsers break on them and some do not, so make them real newlines.
+    .replace(/[\u2028\u2029]/g, '\n')
+    // A soft hyphen draws nothing but still occupies a column, so it shifts
+    // the lyric under its chords.
+    .replaceAll('\u00ad', '')
     .trim();
 }
 

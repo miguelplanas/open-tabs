@@ -1,0 +1,43 @@
+# OpenTabs under systemd, for a Debian LXC on Proxmox.
+#
+#   install -d -o opentabs -g opentabs /var/lib/opentabs
+#   cp deploy/opentabs.service /etc/systemd/system/
+#   printf 'OPENTABS_PASSWORD=%s\n' "$(openssl rand -base64 24)" > /etc/opentabs.env
+#   chmod 600 /etc/opentabs.env
+#   systemctl enable --now opentabs
+
+[Unit]
+Description=OpenTabs tab and chords library
+Documentation=https://github.com/mplanas/open-tabs
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=opentabs
+Group=opentabs
+WorkingDirectory=/opt/opentabs
+ExecStart=/usr/bin/node server/index.js
+Restart=always
+RestartSec=2
+
+Environment=NODE_ENV=production
+Environment=PORT=3000
+# The database lives outside the code directory, so redeploying is just
+# replacing /opt/opentabs and never touches your songs.
+Environment=OPENTABS_DB=/var/lib/opentabs/opentabs.db
+# Holds OPENTABS_PASSWORD. Keep it mode 600 and out of the repo.
+EnvironmentFile=/etc/opentabs.env
+
+# The app reads its own code and writes one directory. Nothing else.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+ReadWritePaths=/var/lib/opentabs
+
+[Install]
+WantedBy=multi-user.target

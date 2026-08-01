@@ -117,6 +117,165 @@ export function versionPickerDialog(versions, { currentId = null } = {}) {
   return { close };
 }
 
+// --- Long press ----------------------------------------------------------
+// Press and hold a row to get at what you can do with it. Pointer events cover
+// finger and mouse alike; the laptop reaches the same menu through contextmenu.
+
+const LONG_PRESS_MS = 500;
+const PRESS_SLOP = 10; // px of travel that still reads as a press, not a scroll
+
+// The tap that ends a long press must not also activate the row it was held
+// on. The guard sits on the document in the capture phase: a row's own handler
+// is on the row itself, where capture and bubble listeners run in registration
+// order, so only an ancestor can reliably get in first. One listener for the
+// whole app, installed on first use, hence nothing for a view to tear down.
+let swallowClick = false;
+let clickGuardInstalled = false;
+function installClickGuard() {
+  if (clickGuardInstalled) return;
+  clickGuardInstalled = true;
+  document.addEventListener('click', (e) => {
+    if (!swallowClick) return;
+    // What is stale is the row the finger was held on, and the scrim now
+    // covering it. A tap that reaches the sheet itself is the user answering
+    // it, so it always goes through.
+    if (e.target?.closest?.('.confirm-box')) return;
+    swallowClick = false;
+    e.preventDefault();
+    e.stopPropagation();
+  }, true);
+}
+
+// Call `handler` when `el` is held down (or right-clicked). Listeners live on
+// `el` only, so they go away with the view's DOM.
+export function onLongPress(el, handler) {
+  installClickGuard();
+  el.classList.add('pressable'); // the CSS side: no iOS callout, no selection
+  let timer = null;
+  let fired = false;
+  let sx = 0;
+  let sy = 0;
+
+  const stop = () => {
+    clearTimeout(timer);
+    timer = null;
+    el.classList.remove('pressing');
+  };
+
+  // Arm the click guard on release, not when the press fires: the finger may
+  // rest on the row for as long as it likes once the sheet is up. The window
+  // expires on its own so a press that never produces a click (a right-click,
+  // a cancelled gesture) cannot eat an unrelated tap later on.
+  const release = () => {
+    if (fired) {
+      fired = false;
+      swallowClick = true;
+      setTimeout(() => { swallowClick = false; }, 700);
+    }
+    stop();
+  };
+
+  el.addEventListener('pointerdown', (e) => {
+    if (e.pointerType === 'mouse' && e.button !== 0) return; // right-click has its own path
+    fired = false;
+    sx = e.clientX;
+    sy = e.clientY;
+    el.classList.add('pressing');
+    timer = setTimeout(() => {
+      timer = null;
+      el.classList.remove('pressing');
+      if (!el.isConnected) return; // the view was replaced mid-press
+      fired = true;
+      handler();
+    }, LONG_PRESS_MS);
+  });
+  el.addEventListener('pointermove', (e) => {
+    if (timer && (Math.abs(e.clientX - sx) > PRESS_SLOP || Math.abs(e.clientY - sy) > PRESS_SLOP)) stop();
+  });
+  el.addEventListener('pointerup', release);
+  el.addEventListener('pointercancel', release); // a scroll took the gesture over
+  el.addEventListener('pointerleave', stop);
+  el.addEventListener('contextmenu', (e) => {
+    // Always swallow the native menu, and on iOS the callout with it: whether
+    // or not we open ours, "open link in new tab" is not what a song row is for.
+    e.preventDefault();
+    if (fired) return; // the hold timer got there first
+    stop();
+    fired = true;
+    handler();
+  });
+}
+
+// Long-press action sheet for one song row. `versions` is a group as the
+// library builds them: with more than one, the sheet asks which version the
+// actions apply to before offering them. `extra` rows (a collection's "remove
+// from this collection") sit between the plain actions and the destructive one.
+export function songActionsSheet(versions, { extra = [], onDeleted } = {}) {
+  let song = versions[0];
+  const many = versions.length > 1;
+  const el = h(`
+    <div class="actions">
+      <div class="actions-head">
+        <div class="actions-title">${escapeHtml(song.title)}</div>
+        <div class="actions-sub">${escapeHtml(song.artist || 'Unknown artist')}</div>
+      </div>
+      ${many ? `
+      <div class="actions-label">Apply to</div>
+      <ul class="picker-list actions-versions" id="as-versions"></ul>` : ''}
+      <div class="actions-list" id="as-actions"></div>
+    </div>`);
+  const sheet = openSheet(el);
+
+  const $versions = el.querySelector('#as-versions');
+  function renderVersions() {
+    $versions.innerHTML = '';
+    for (const v of versions) {
+      const current = v.id === song.id;
+      const row = h(`
+        <li class="picker-row${current ? ' member' : ''}">
+          <span class="picker-name">${escapeHtml(versionLabel(v))}</span>
+          ${current ? '<span class="picker-check">✓</span>' : ''}
+        </li>`);
+      row.onclick = () => { song = v; renderVersions(); };
+      $versions.append(row);
+    }
+  }
+  if ($versions) renderVersions();
+
+  const $actions = el.querySelector('#as-actions');
+  function action(label, { danger = false } = {}) {
+    const btn = h(`<button type="button" class="action-row${danger ? ' danger' : ''}">${escapeHtml(label)}</button>`);
+    $actions.append(btn);
+    return btn;
+  }
+
+  action('Add to collection').onclick = () => { sheet.close(); addToCollectionDialog(song); };
+  action('Edit').onclick = () => { sheet.close(); location.hash = '#/edit/' + song.id; };
+  for (const item of extra) {
+    action(item.label).onclick = () => { sheet.close(); item.onSelect(song); };
+  }
+  action(many ? 'Delete this version' : 'Delete song', { danger: true }).onclick = async () => {
+    const doomed = song;
+    sheet.close();
+    const what = many
+      ? `the ${versionLabel(doomed)} version of “${doomed.title}”`
+      : `“${doomed.title}”`;
+    const ok = await confirmDialog(`Delete ${what}? This cannot be undone.`, {
+      danger: true, confirmLabel: 'Delete',
+    });
+    if (!ok) return;
+    try {
+      await api('/songs/' + doomed.id, { method: 'DELETE' });
+      toast(`Deleted “${doomed.title}”`);
+      onDeleted?.(doomed);
+    } catch (err) {
+      if (err.message !== 'unauthorized') toast('Delete failed: ' + err.message, { danger: true });
+    }
+  };
+
+  return sheet;
+}
+
 // Bottom sheet built around a caller-supplied element. Same visual language as
 // the dialogs (scrim plus slide-up card) but it stays open and hands back a
 // close(), so callers can host live controls that keep acting on the view
@@ -139,7 +298,13 @@ export function openSheet(content) {
   }
   function onKey(e) { if (e.key === 'Escape') close(); }
   document.addEventListener('keydown', onKey);
-  overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+  // A sheet raised by a long press opens with the finger still down, and the
+  // click that ends that press lands on the fresh scrim: ignore taps outside
+  // for as long as that one can still arrive.
+  const openedAt = Date.now();
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay && Date.now() - openedAt > 400) close();
+  });
   return { close };
 }
 

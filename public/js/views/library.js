@@ -1,5 +1,7 @@
 import { $app, api, h, escapeHtml, debounce } from '../app.js';
-import { segmentNav, groupVersions, versionPickerDialog } from '../ui.js';
+import {
+  segmentNav, groupVersions, versionPickerDialog, onLongPress, songActionsSheet,
+} from '../ui.js';
 
 const PREFS_KEY = 'opentabs.libraryPrefs';
 
@@ -81,11 +83,28 @@ export async function libraryView() {
       }
       for (const artist of [...byArtist.keys()].sort((a, b) => a.localeCompare(b))) {
         $list.append(h(`<li class="group-header">${escapeHtml(artist)}</li>`));
-        for (const g of byArtist.get(artist)) $list.append(songItem(g, true));
+        for (const g of byArtist.get(artist)) $list.append(songItem(g, true, dropSong));
       }
     } else {
-      for (const g of groups) $list.append(songItem(g, false));
+      for (const g of groups) $list.append(songItem(g, false, dropSong));
     }
+  }
+
+  // Songs, not rows: a song with three versions counts once. Only meaningful
+  // over the whole library, so a filtered list leaves the header alone.
+  function renderCount() {
+    if ($q.value.trim()) return;
+    const n = groupVersions(all).length;
+    document.getElementById('count').textContent =
+      n > 0 ? `· ${n} ${n === 1 ? 'song' : 'songs'}` : '';
+  }
+
+  // A version deleted from the action sheet is already gone on the server, so
+  // drop it here rather than refetching: the list keeps its scroll position.
+  function dropSong(song) {
+    all = all.filter((s) => s.id !== song.id);
+    renderCount();
+    render();
   }
 
   let gen = 0;
@@ -97,12 +116,7 @@ export async function libraryView() {
       const q = $q.value.trim();
       all = await api(q ? '/songs?q=' + encodeURIComponent(q) : '/songs');
       if (my !== gen) return; // a newer search superseded this response
-      if (!$q.value.trim()) {
-        // Songs, not rows: a song with three versions counts once.
-        const n = groupVersions(all).length;
-        document.getElementById('count').textContent =
-          n > 0 ? `· ${n} ${n === 1 ? 'song' : 'songs'}` : '';
-      }
+      renderCount();
       render();
     } catch (err) {
       if (my === gen && err.message !== 'unauthorized') {
@@ -128,8 +142,9 @@ export async function libraryView() {
 
 // `versions` is a group: one song, one or more rows. A single version behaves
 // exactly as before (a plain link); several open the picker instead, so the
-// choice of version happens before the reader, not inside it.
-function songItem(versions, hideArtist) {
+// choice of version happens before the reader, not inside it. Holding the row
+// opens what you can do with the song instead of opening it.
+function songItem(versions, hideArtist, onDeleted) {
   const s = versions[0];
   const many = versions.length > 1;
   const li = h(`
@@ -141,6 +156,8 @@ function songItem(versions, hideArtist) {
       }</div>
       ${hideArtist ? '' : `<div class="meta">${escapeHtml(s.artist || 'Unknown artist')}</div>`}
     </a></li>`);
-  if (many) li.querySelector('a').onclick = () => versionPickerDialog(versions);
+  const a = li.querySelector('a');
+  if (many) a.onclick = () => versionPickerDialog(versions);
+  onLongPress(a, () => songActionsSheet(versions, { onDeleted }));
   return li;
 }

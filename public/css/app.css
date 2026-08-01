@@ -260,6 +260,22 @@ code { font-family: var(--mono); font-size: 0.9em; }
   overflow-x: auto; overscroll-behavior-x: contain;
   white-space: pre;
 }
+/* Reflowed chord and lyric lines. The reader switches to this only when a song
+   would otherwise need a font too small to read (reader.js). Each word is an
+   unbreakable box carrying its chords above its own syllables, so the line
+   wraps like a paragraph instead of forcing the whole song to shrink. A cell is
+   as wide as the wider of its chord and its syllable, which is what stops two
+   chords from colliding after wrapping. */
+.tabbody .row { display: block; white-space: normal; min-height: 1.3em; }
+.tabbody .row.flow { white-space: pre-wrap; }
+.tabbody .pair { display: block; white-space: normal; }
+.tabbody .word { display: inline-block; white-space: nowrap; vertical-align: bottom; }
+.tabbody .cell { display: inline-block; vertical-align: bottom; }
+.tabbody .cell .ch { display: block; min-height: 1.3em; line-height: 1.3; }
+.tabbody .cell .ly { display: block; white-space: pre; }
+/* A lyric line with no chords over it still has to wrap when reflowing. */
+.tabbody .flow { display: block; white-space: pre-wrap; }
+
 .tabbody .chord { color: var(--chord); font-weight: 700; cursor: pointer; }
 .tabbody .section {
   font-family: var(--serif); font-style: italic; font-size: 1.15em; font-weight: 600;
@@ -528,3 +544,41 @@ label.f > * { margin-top: 4px; }
 .picker-row.member .picker-check { background: var(--accent); color: var(--accent-ink); }
 .picker-empty { color: var(--muted); text-align: center; padding: 20px; }
 .picker-new { width: 100%; margin-bottom: 12px; }
+
+/* Long-press action sheet. The class is applied by onLongPress() in ui.js, so
+   only rows that actually carry a menu give up their text: iOS would otherwise
+   select the title and raise its own callout over ours, and the tab body in
+   the reader has to stay selectable. */
+.pressable {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+/* Held long enough to count: the tint arrives over roughly the same time as
+   the press it acknowledges, then snaps back the moment the finger lifts. */
+.pressable.pressing { background: var(--accent-soft); transition: background-color 0.45s ease-out; }
+
+.actions { display: flex; flex-direction: column; gap: 12px; }
+.actions-title {
+  font-family: var(--serif); font-size: 18px; font-weight: 600; line-height: 1.25;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.actions-sub { font-size: 13px; color: var(--muted); margin-top: 2px; }
+.actions-label { font-size: 12.5px; color: var(--muted-2); margin-bottom: -6px; }
+.actions-versions { margin: 0; max-height: 34vh; }
+.actions-list { display: flex; flex-direction: column; gap: 8px; }
+.action-row {
+  width: 100%; text-align: left; cursor: pointer;
+  background: var(--bg3); border: 1px solid var(--border); border-radius: 10px;
+  color: var(--fg); font-family: var(--sans); font-size: 15px;
+  padding: 12px 14px; min-height: 46px;
+}
+.action-row:hover { background: var(--bg4); }
+.action-row:active { transform: scale(0.99); }
+/* Destructive last and set apart, so it is never the row you hit by reflex. */
+.action-row.danger {
+  color: var(--danger); background: none;
+  border: none; border-top: 1px solid var(--hair); border-radius: 0;
+  margin-top: 4px; padding-top: 16px;
+}
+.action-row.danger:hover { background: var(--bg3); }

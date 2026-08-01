@@ -57,6 +57,10 @@ export async function readerView([id]) {
   let speed = song.scroll_speed || DEFAULT_SPEED; // pixels per second
   let level = speedToLevel(speed);
   let fontSize = Number(localStorage.getItem('opentabs.fontSize')) || 14;
+  // 'auto' wraps only the songs that would otherwise be unreadable; 'off'
+  // always keeps the original monospace layout, shrinking as before.
+  let reflowPref = localStorage.getItem('opentabs.reflow') === 'off' ? 'off' : 'auto';
+  let reflowing = false;
   let playing = false;
   let wakeLock = null;
   let wakeIdle = null;
@@ -149,20 +153,32 @@ export async function readerView([id]) {
     return w;
   }
 
-  function fitWidth() {
-    // Fit the chord and lyric lines to the viewport so a song never needs
-    // sideways dragging while you play. Only ever shrink from the chosen size,
-    // and never past MIN_FIT_FONT.
+  // The font size a plain (non-reflowed) render would need for this song to fit
+  // the viewport. Returns the chosen size when no shrinking is required.
+  function fittedFont() {
     $body.style.fontSize = fontSize + 'px';
-    if (!fitTarget) return;
+    if (!fitTarget) return fontSize;
     const cs = getComputedStyle($body);
     const padX = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight);
     const avail = $body.clientWidth - padX;
     const needed = fitTarget * charWidth();
-    if (avail > 0 && needed > avail) {
-      $body.style.fontSize =
-        Math.max(MIN_FIT_FONT, (fontSize * (avail - 1)) / needed) + 'px';
-    }
+    if (avail <= 0 || needed <= avail) return fontSize;
+    return (fontSize * (avail - 1)) / needed;
+  }
+
+  // Reflow is a rescue, not a style: a song that fits at a readable size keeps
+  // its original monospace alignment, which is what a guitarist recognizes.
+  // Only when fitting would push the text below MIN_FIT_FONT is the chord and
+  // lyric pairing worth the extra vertical length it costs.
+  function wantsReflow() {
+    if (reflowPref === 'off') return false;
+    return fittedFont() < MIN_FIT_FONT;
+  }
+
+  function fitWidth() {
+    // A reflowed song fits by construction, so it keeps the chosen size.
+    if (reflowing) { $body.style.fontSize = fontSize + 'px'; return; }
+    $body.style.fontSize = Math.max(MIN_FIT_FONT, fittedFont()) + 'px';
   }
 
   function computeEndLimit() {
@@ -175,7 +191,7 @@ export async function readerView([id]) {
   }
 
   function render() {
-    $body.innerHTML = renderBody(bodyText, transpose);
+    $body.innerHTML = renderBody(bodyText, transpose, { reflow: reflowing });
     syncMeta();
   }
 
@@ -205,6 +221,11 @@ export async function readerView([id]) {
   }
 
   function relayout() {
+    const want = wantsReflow();
+    if (want !== reflowing) {
+      reflowing = want;
+      render(); // the two layouts are different HTML, not just different CSS
+    }
     fitWidth();
     computeEndLimit();
     updateProgress();
@@ -279,6 +300,11 @@ export async function readerView([id]) {
           </div>
         </div>
         <div class="tool-row">
+          <span class="tool-label">Wrap long lines</span>
+          <button class="btn${reflowPref === 'auto' ? ' active' : ''}" id="rf-btn"
+                  aria-pressed="${reflowPref === 'auto'}">${reflowPref === 'auto' ? 'Auto' : 'Off'}</button>
+        </div>
+        <div class="tool-row">
           <span class="tool-label">Font size</span>
           <div class="pill">
             <button id="fs-down" aria-label="Smaller text">A-</button>
@@ -306,6 +332,15 @@ export async function readerView([id]) {
     }
     el.querySelector('#tr-down').onclick = () => setTranspose(transpose - 1);
     el.querySelector('#tr-up').onclick = () => setTranspose(transpose + 1);
+    const $rf = el.querySelector('#rf-btn');
+    $rf.onclick = () => {
+      reflowPref = reflowPref === 'auto' ? 'off' : 'auto';
+      localStorage.setItem('opentabs.reflow', reflowPref);
+      $rf.classList.toggle('active', reflowPref === 'auto');
+      $rf.setAttribute('aria-pressed', String(reflowPref === 'auto'));
+      $rf.textContent = reflowPref === 'auto' ? 'Auto' : 'Off';
+      relayout();
+    };
     el.querySelector('#fs-down').onclick = () => setFont(fontSize - 1);
     el.querySelector('#fs-up').onclick = () => setFont(fontSize + 1);
     el.querySelector('#sheet-speed').oninput = (e) => setLevel(Number(e.target.value));

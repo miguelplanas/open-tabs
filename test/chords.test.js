@@ -142,6 +142,54 @@ test('detectKind calls a chord sheet with one stray stave chords', () => {
   assert.equal(detectKind(body), 'chords');
 });
 
+test('reflow binds each chord to the word underneath it', () => {
+  //      col 0     col 10
+  const out = renderBody('C         G\nhello     world', 0, { reflow: true });
+  // Two words, each carrying its own chord.
+  assert.equal(out.match(/class="word"/g).length, 2);
+  assert.match(out, /class="chord">C<\/span><\/span><span class="ly">hello/);
+  assert.match(out, /class="chord">G<\/span><\/span><span class="ly">world/);
+});
+
+test('reflow splits a word when a chord lands inside it', () => {
+  // The G sits on the fourth character of "hello", so the word becomes two
+  // cells and stays one unbreakable word.
+  const out = renderBody('C   G\nhello', 0, { reflow: true });
+  assert.equal(out.match(/class="word"/g).length, 1);
+  assert.equal(out.match(/class="cell"/g).length, 2);
+  assert.match(out, /class="ly">hell</);
+  assert.match(out, /class="ly">o</);
+});
+
+test('reflow keeps chords that run past the end of the lyric', () => {
+  const out = renderBody('C   G   Am\nhey', 0, { reflow: true });
+  assert.equal(out.match(/class="chord"/g).length, 3);
+});
+
+test('reflow transposes and never emits raw markup', () => {
+  const out = renderBody('C\n<b>hi</b>', 0, { reflow: true });
+  assert.ok(!out.includes('<b>'));
+  assert.match(renderBody('C\nhi', 2, { reflow: true }), /class="chord">D</);
+});
+
+test('reflow leaves staves and section headers alone', () => {
+  const out = renderBody('[Verse]\ne|--0--2--|\nB|--1--3--|', 0, { reflow: true });
+  assert.match(out, /class="row section"/);
+  assert.equal(out.match(/class="tabblock"/g).length, 1);
+  assert.ok(!out.includes('class="row pair"'));
+  // Reflowed rows are block boxes and must not also be separated by newlines,
+  // or every gap in the song doubles. Newlines inside a stave are the point of
+  // the stave, so they stay.
+  assert.ok(!/<\/span>\n<span class="row/.test(out));
+  assert.match(out, /tabline">e\|--0--2--\|<\/span>\n<span class="tabline"/);
+});
+
+test('renderBody without reflow is unchanged', () => {
+  const body = '[Verse]\nC   G\nlyrics\ne|--0--|';
+  assert.equal(renderBody(body, 0), renderBody(body, 0, { reflow: false }));
+  assert.ok(!renderBody(body, 0).includes('class="cell"'));
+});
+
 test('fitChars is zero for a body with nothing to fit', () => {
   assert.equal(fitChars(''), 0);
   assert.equal(fitChars('\n\n  \n'), 0);

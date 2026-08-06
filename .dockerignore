@@ -1,0 +1,14 @@
+# Keep the build context small and never ship local state into the image.
+node_modules/
+data/
+*.db
+*.db-wal
+*.db-shm
+.env
+.git/
+.gitignore
+.claude/
+docs/
+deploy/
+test/
+tasks.md

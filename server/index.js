@@ -15,14 +15,19 @@ const app = new Hono();
 // and that is the failure a plain TCP check would miss. Left unauthenticated
 // (it is outside /api) so a monitor does not need a session, and it exposes
 // nothing but a row count.
-app.get('/healthz', (c) => {
+// Answers on /health too because most hosting panels (Dokploy, Coolify, plain
+// Docker HEALTHCHECK) default to that path.
+app.get('/healthz', health);
+app.get('/health', health);
+
+function health(c) {
   try {
     const { n } = db.prepare('SELECT COUNT(*) AS n FROM songs').get();
     return c.json({ ok: true, songs: n });
   } catch (err) {
     return c.json({ ok: false, error: err.message }, 503);
   }
-});
+}
 
 // Default deny: every /api route requires a session except the auth
 // endpoints themselves (see PUBLIC_API in auth.js).

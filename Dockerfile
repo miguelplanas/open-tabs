@@ -15,4 +15,9 @@ ENV OPENTABS_DB=/data/opentabs.db
 VOLUME /data
 EXPOSE 3000
 
+# Fails the container if the process is up but the database is unreachable,
+# which is what a missing /data volume mount looks like from outside.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD curl -fsS "http://127.0.0.1:${PORT:-3000}/health" || exit 1
+
 CMD ["node", "server/index.js"]

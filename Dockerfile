@@ -9,6 +9,7 @@ RUN npm ci --omit=dev
 
 COPY server ./server
 COPY public ./public
+COPY scripts ./scripts
 
 ENV NODE_ENV=production
 ENV OPENTABS_DB=/data/opentabs.db

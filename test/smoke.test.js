@@ -168,3 +168,7 @@ test('an unknown route answers 404', async () => {
   const missing = await fetch(`${base}/api/songs/999999`);
   assert.equal(missing.status, 404);
 });
+
+test('ROTO A PROPOSITO - borrar', () => {
+  assert.strictEqual(1, 2);
+});

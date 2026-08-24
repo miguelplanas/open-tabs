@@ -18,11 +18,3 @@ jobs:
       - run: npm test
         env:
           OPENTABS_DB: /tmp/test.db
-
-  deploy:
-    needs: test
-    if: github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Disparar despliegue en Dokploy
-        run: curl -fsS -X POST "${{ secrets.DOKPLOY_WEBHOOK }}"

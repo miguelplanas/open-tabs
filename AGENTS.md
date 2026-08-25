@@ -24,6 +24,11 @@ Before opening the PR, self-check:
 
 - Did I touch `public/`? Then bump the cache names in `public/sw.js`, or the
   installed PWA will keep serving stale assets after deploy.
+- Did I redraw an icon? Then bump the `?v=` on every icon URL, in
+  `index.html`, `manifest.webmanifest` and the `sw.js` SHELL list. The cache
+  name above does not help here: the browser keeps favicons in a separate
+  cache keyed by URL, which outlives both a hard refresh and the service
+  worker, so the same URL keeps serving the old drawing.
 - Did I add a new directory? Then add it to the Dockerfile `COPY` list
   (see Repo traps).
 - Does the PR do exactly one thing?

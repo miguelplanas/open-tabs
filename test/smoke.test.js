@@ -168,3 +168,19 @@ test('an unknown route answers 404', async () => {
   const missing = await fetch(`${base}/api/songs/999999`);
   assert.equal(missing.status, 404);
 });
+
+// The manifest is the only thing tying the icon files to the installed PWA,
+// and a broken link there fails silently: iOS just keeps the old home-screen
+// icon. Cheap to assert that every icon it promises is actually served.
+test('every icon the manifest references is served', async () => {
+  const res = await fetch(`${base}/manifest.webmanifest`);
+  assert.equal(res.status, 200);
+  const { icons } = await res.json();
+  assert.ok(icons.length > 0);
+
+  for (const icon of icons) {
+    const got = await fetch(`${base}${icon.src}`);
+    assert.equal(got.status, 200, `${icon.src} is not served`);
+    assert.equal(got.headers.get('content-type').split(';')[0], icon.type);
+  }
+});

@@ -58,9 +58,14 @@ therefore worthless as a signal and the deploy step parses the body instead.
 Keep it that way: the failure mode this guards against is a green pipeline
 that deployed nothing.
 
-The dev machine (`devbox`) and `prod` never talk to each other. GitHub is the
-only bridge. Never edit files inside the running container: the next deploy
-discards them.
+**Ship through GitHub, never straight at `prod`.** This is a working rule, not
+a network fact: `devbox` and `prod` share a tailnet, and MagicDNS resolves
+`prod` from `devbox`, so nothing stops you reaching it by hand. Do not. The
+point of routing everything through `main` is that what runs in production is
+always a reviewed commit somebody can find again, rather than whatever was on
+a laptop that afternoon. For the same reason, never edit files inside the
+running container: the next deploy discards them and the change leaves no
+trace.
 
 ## Architecture
 

@@ -18,3 +18,48 @@ jobs:
       - run: npm test
         env:
           OPENTABS_DB: /tmp/test.db
+
+  deploy:
+    # Merging is deploying. Only on pushes to main, and only once test is green.
+    #
+    # prod has no public address: it answers on a Tailscale name that resolves
+    # into 100.64.0.0/10, so GitHub cannot reach it from the open internet.
+    # That is why the old deploy job was removed (#3), and why pointing the
+    # Dokploy GitHub App's webhook at http://prod:3000 never delivered. The
+    # fix is to bring the runner into the tailnet as an ephemeral tagged node
+    # instead of exposing prod, then poke Dokploy's deploy hook from inside.
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      # Until the three secrets exist this job succeeds without doing anything,
+      # so an unconfigured repo does not paint main red on every merge.
+      - id: cfg
+        name: Are the deploy secrets configured?
+        env:
+          CLIENT_ID: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          CLIENT_SECRET: ${{ secrets.TS_OAUTH_SECRET }}
+          DEPLOY_URL: ${{ secrets.DOKPLOY_DEPLOY_URL }}
+        run: |
+          if [ -n "$CLIENT_ID" ] && [ -n "$CLIENT_SECRET" ] && [ -n "$DEPLOY_URL" ]; then
+            echo 'ready=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'ready=false' >> "$GITHUB_OUTPUT"
+            echo '::notice::Deploy secrets not set yet, skipping the deploy step.'
+          fi
+
+      - name: Join the tailnet
+        if: steps.cfg.outputs.ready == 'true'
+        uses: tailscale/github-action@v3
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+          tags: tag:ci
+
+      - name: Ask Dokploy to redeploy
+        if: steps.cfg.outputs.ready == 'true'
+        env:
+          DEPLOY_URL: ${{ secrets.DOKPLOY_DEPLOY_URL }}
+        # Dokploy answers as soon as it has queued the build, so a 2xx here
+        # means "accepted", not "live". Watch the deploy in Dokploy itself.
+        run: curl -fsS --max-time 60 -X POST "$DEPLOY_URL"

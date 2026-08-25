@@ -30,15 +30,25 @@ Before opening the PR, self-check:
 
 ## Deployment
 
-`main` -> webhook -> Dokploy -> Docker Swarm on the `prod` VM.
+`main` -> CI -> Tailscale -> Dokploy -> Docker Swarm on the `prod` VM.
 
 **Merging is deploying.** There is no staging environment. A merged PR is live
 in about two minutes. This is why step 6 above exists.
 
-CI (`.github/workflows/ci.yml`) runs the test job on pull requests and on
-pushes to `main`. The ruleset requires that check to pass before a merge is
-allowed. CI does not deploy: GitHub runners live on the public internet and
-`prod` is only reachable over Tailscale.
+CI (`.github/workflows/ci.yml`) runs `test` on pull requests and on pushes to
+`main`; the ruleset requires it to pass before a merge is allowed. On pushes
+to `main` only, a second `deploy` job then calls Dokploy's deploy hook.
+
+**A webhook from GitHub cannot work here, so do not try to reinstate one.**
+`prod` answers on a Tailscale name that resolves into `100.64.0.0/10`, which
+is not routable from the internet, so GitHub's delivery attempts fail with
+"failed to connect to host". The deploy job gets around this by joining the
+tailnet as an ephemeral node tagged `tag:ci` and calling the hook from inside
+the network, rather than by exposing `prod`. It needs three repository
+secrets, and succeeds without deploying while any of them is missing:
+`TS_OAUTH_CLIENT_ID`, `TS_OAUTH_SECRET` (a Tailscale OAuth client that can
+mint `tag:ci` keys) and `DOKPLOY_DEPLOY_URL`. The tailnet ACL has to let
+`tag:ci` reach `prod:3000`.
 
 The dev machine (`devbox`) and `prod` never talk to each other. GitHub is the
 only bridge. Never edit files inside the running container: the next deploy

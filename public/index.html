@@ -10,8 +10,11 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>OpenTabs</title>
   <link rel="manifest" href="/manifest.webmanifest">
-  <link rel="icon" href="/icons/icon.svg" type="image/svg+xml">
-  <link rel="apple-touch-icon" href="/icons/icon-180.png">
+  <!-- The ?v= is load-bearing: browsers key the favicon cache by URL and hold
+       it far longer than the page cache, so a redrawn icon at the same URL
+       keeps showing the old one. Bump it whenever the icons change. -->
+  <link rel="icon" href="/icons/icon.svg?v=2" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/icons/icon-180.png?v=2">
   <link rel="stylesheet" href="/css/app.css">
 </head>
 <body>

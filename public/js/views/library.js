@@ -16,12 +16,14 @@ export async function libraryView() {
   sessionStorage.removeItem('opentabs.setlist');
   $app.innerHTML = `
     <header class="topbar">
-      <h1>OpenTabs <span class="count" id="count"></span></h1>
-      <button class="btn icon" id="go-search" title="Search online">🌐</button>
-      <button class="btn primary" id="go-new">+ New</button>
+      <div class="topbar-row">
+        <h1>OpenTabs <span class="count" id="count"></span></h1>
+        <button class="btn icon" id="go-search" title="Search online">🌐</button>
+        <button class="btn primary" id="go-new">+ New</button>
+      </div>
+      <div id="seg"></div>
     </header>
     <main class="content">
-      <div id="seg"></div>
       <input class="searchbox" id="q" type="search" placeholder="Search your library…" autocomplete="off">
       <div class="toolbar">
         <select class="btn" id="sort"></select>

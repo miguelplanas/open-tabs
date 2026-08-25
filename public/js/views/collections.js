@@ -5,11 +5,13 @@ import { promptDialog, segmentNav, toast } from '../ui.js';
 export async function collectionsView() {
   $app.innerHTML = `
     <header class="topbar">
-      <h1>OpenTabs</h1>
-      <button class="btn primary" id="new-col">+ New</button>
+      <div class="topbar-row">
+        <h1>OpenTabs</h1>
+        <button class="btn primary" id="new-col">+ New</button>
+      </div>
+      <div id="seg"></div>
     </header>
     <main class="content">
-      <div id="seg"></div>
       <ul class="songlist" id="list"><li class="spinner">Loading…</li></ul>
     </main>`;
 

@@ -60,6 +60,26 @@ jobs:
         if: steps.cfg.outputs.ready == 'true'
         env:
           DEPLOY_URL: ${{ secrets.DOKPLOY_DEPLOY_URL }}
-        # Dokploy answers as soon as it has queued the build, so a 2xx here
-        # means "accepted", not "live". Watch the deploy in Dokploy itself.
-        run: curl -fsS --max-time 60 -X POST "$DEPLOY_URL"
+          REF: ${{ github.ref }}
+        # Dokploy reads the branch out of the webhook payload and refuses
+        # anything that does not match the branch the app is configured with,
+        # so the push event has to be reproduced: an empty POST just earns a
+        # {"message":"Branch Not Match"}.
+        #
+        # That refusal comes back as HTTP 200, so the status code says nothing
+        # about whether a deploy actually started. The body is the only signal,
+        # which is why it is inspected rather than discarded: a deploy that
+        # never ran must not report success.
+        run: |
+          body=$(curl -sS --max-time 60 -X POST "$DEPLOY_URL" \
+            -H 'Content-Type: application/json' \
+            -H 'X-GitHub-Event: push' \
+            -d "{\"ref\":\"$REF\"}")
+          echo "Dokploy answered: $body"
+          case "$body" in
+            *"Not Match"*|*nauthorized*|*"not found"*|*'"error"'*)
+              echo "::error::Dokploy refused the deploy: $body"
+              exit 1
+              ;;
+          esac
+          echo "Deploy queued. It is live once Dokploy finishes the build."

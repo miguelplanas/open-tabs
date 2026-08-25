@@ -1,10 +1,14 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
   <!-- Folio: an open songbook whose ruled lines are the six strings, thin
        treble to thick bass. The pages taper toward the spine, so the strings
-       aim at a vanishing point far off-canvas: true perspective, but distant
-       enough that they read as a parallel set rather than a splay. Palette is
-       the app's own (paper --bg, pine --accent); the stroke on the pages is
-       what rounds their corners. -->
+       aim at a vanishing point far off canvas: true perspective, but distant
+       enough that they read as a parallel set rather than a splay. Colours are
+       the app's own paper and accent tokens from css/app.css; the stroke on
+       the pages is what rounds their corners.
+
+       Careful with the wording here: XML forbids a double hyphen inside a
+       comment, so naming the CSS custom properties outright leaves the file
+       unparseable and the favicon blank. -->
   <rect width="512" height="512" rx="114" fill="#f6f1e7"/>
   <g fill="#2f6e5b" stroke="#2f6e5b" stroke-width="12" stroke-linejoin="round">
     <path d="M102 150 L245 170 L245 342 L102 362 Z"/>

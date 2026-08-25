@@ -1,6 +1,8 @@
 import { serve } from '@hono/node-server';
 import { serveStatic } from '@hono/node-server/serve-static';
 import { Hono } from 'hono';
+import { createHash } from 'node:crypto';
+import { readdirSync, readFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { ROOT, db } from './db.js';
 import { auth, apiAuth, authEnabled } from './auth.js';
@@ -36,6 +38,43 @@ app.route('/api', auth);
 app.route('/api/songs', songs);
 app.route('/api/collections', collections);
 app.route('/api/sources', sources);
+
+// The service worker names its cache after this hash, so a deploy that changed
+// any asset purges the old entries instead of serving them for one more load.
+// Computed once at import: the image is immutable, so the value is stable
+// across restarts and identical for the same build.
+//
+// This replaced a hand-bumped counter. Every PR touching public/ had to raise
+// it, which meant a conflict whenever two branches raised it to the same
+// number, and a rebase could drop the bump without saying anything.
+const shellVersion = createHash('sha256')
+  .update(
+    publicFiles(join(ROOT, 'public'))
+      .sort()
+      .map((f) => `${relative(ROOT, f)}\0${readFileSync(f).toString('base64')}`)
+      .join('\n')
+  )
+  .digest('hex')
+  .slice(0, 12);
+
+function publicFiles(dir) {
+  return readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
+    const full = join(dir, e.name);
+    return e.isDirectory() ? publicFiles(full) : [full];
+  });
+}
+
+// Must be registered before serveStatic below, which would otherwise serve the
+// file verbatim, placeholder and all. no-store because a stale service worker
+// keeps serving a stale everything.
+app.get('/sw.js', (c) => {
+  const src = readFileSync(join(ROOT, 'public', 'sw.js'), 'utf8')
+    .replaceAll('__SHELL_VERSION__', shellVersion);
+  return c.body(src, 200, {
+    'Content-Type': 'text/javascript; charset=utf-8',
+    'Cache-Control': 'no-store',
+  });
+});
 
 // serveStatic resolves against process.cwd(), so hand it a CWD-relative path
 // to the project's public/ dir to work from any launch directory.

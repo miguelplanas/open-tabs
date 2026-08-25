@@ -97,7 +97,7 @@ code { font-family: var(--mono); font-size: 0.9em; }
 
 .topbar {
   position: sticky; top: 0; z-index: 10;
-  display: flex; align-items: center; gap: 10px;
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
   padding: calc(10px + var(--safe-top)) 14px 10px;
   background: var(--glass);
   backdrop-filter: blur(10px);
@@ -109,6 +109,9 @@ code { font-family: var(--mono); font-size: 0.9em; }
   font-size: 20px; font-weight: 600; letter-spacing: -0.01em;
   margin: 0; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
+/* Second row inside the sticky topbar (e.g. the Songs/Collections switcher),
+   so it stays pinned with the title instead of scrolling away with .content. */
+.topbar-row { display: flex; align-items: center; gap: 10px; flex: 0 0 100%; }
 .topbar .sub {
   display: block;
   font-family: var(--sans);
@@ -197,6 +200,9 @@ code { font-family: var(--mono); font-size: 0.9em; }
 }
 .segment:hover { color: var(--fg); }
 .segment.active { background: var(--accent); color: var(--accent-ink); }
+/* Inside .topbar the sticky header's own bottom padding already provides
+   the gap to the border, so the switcher doesn't need its own margin too. */
+.topbar .segments { margin-bottom: 0; }
 
 /* Collections */
 .col-desc { color: var(--muted); font-size: 14px; margin: 0 0 12px; line-height: 1.5; }

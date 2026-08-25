@@ -50,6 +50,14 @@ secrets, and succeeds without deploying while any of them is missing:
 mint `tag:ci` keys) and `DOKPLOY_DEPLOY_URL`. The tailnet ACL has to let
 `tag:ci` reach `prod:3000`.
 
+**Dokploy answers 200 even when it refuses to deploy.** It reads the branch
+out of the webhook payload, so the call has to reproduce a push event
+(`X-GitHub-Event: push` and a body carrying `ref`); an empty POST earns a
+`{"message":"Branch Not Match"}` with a 200 attached. The status code is
+therefore worthless as a signal and the deploy step parses the body instead.
+Keep it that way: the failure mode this guards against is a green pipeline
+that deployed nothing.
+
 The dev machine (`devbox`) and `prod` never talk to each other. GitHub is the
 only bridge. Never edit files inside the running container: the next deploy
 discards them.

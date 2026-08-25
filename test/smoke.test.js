@@ -12,7 +12,7 @@ import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { createServer } from 'node:net';
-import { rmSync } from 'node:fs';
+import { readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -183,4 +183,30 @@ test('every icon the manifest references is served', async () => {
     assert.equal(got.status, 200, `${icon.src} is not served`);
     assert.equal(got.headers.get('content-type').split(';')[0], icon.type);
   }
+});
+
+// A malformed SVG does not fail loudly: the browser abandons the parse and
+// draws nothing, which looks exactly like a favicon that was never deployed.
+// Serving the file with a 200, which the test above checks, proves nothing.
+// Node ships no XML parser, so this covers the two ways this file has actually
+// broken rather than pretending to validate the whole grammar.
+test('icon.svg is well-formed enough for a browser to draw it', () => {
+  const svg = readFileSync(join(ROOT, 'public/icons/icon.svg'), 'utf8');
+
+  // XML forbids "--" inside a comment. Writing the CSS custom property names
+  // (the ones spelled with two leading hyphens) into the header comment
+  // silently blanked the tab icon in every desktop browser.
+  for (const [, body] of svg.matchAll(/<!--([\s\S]*?)-->/g)) {
+    assert.ok(!body.includes('--'), 'an XML comment contains a double hyphen');
+  }
+
+  // Every element opened is closed, in order.
+  const stack = [];
+  for (const [, slash, name, , selfClose] of svg
+    .replace(/<!--[\s\S]*?-->/g, '')
+    .matchAll(/<(\/?)([a-zA-Z][\w:.-]*)((?:[^>"']|"[^"]*"|'[^']*')*?)(\/?)>/g)) {
+    if (slash) assert.equal(stack.pop(), name, `stray closing tag </${name}>`);
+    else if (!selfClose) stack.push(name);
+  }
+  assert.deepEqual(stack, [], 'unclosed elements in icon.svg');
 });

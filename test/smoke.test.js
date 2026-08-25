@@ -210,3 +210,26 @@ test('icon.svg is well-formed enough for a browser to draw it', () => {
   }
   assert.deepEqual(stack, [], 'unclosed elements in icon.svg');
 });
+
+// The service worker's cache name is a hash of public/, substituted at request
+// time (server/index.js). It replaced a hand-bumped counter, so what matters
+// is that the substitution actually happens: a placeholder that reached the
+// browser would pin every deploy to one cache name for ever, and nothing else
+// would notice.
+test('/sw.js is served with the shell version substituted', async () => {
+  const res = await fetch(`${base}/sw.js`);
+  assert.equal(res.status, 200);
+  assert.match(res.headers.get('content-type'), /javascript/);
+  // A cached service worker keeps serving a cached everything.
+  assert.equal(res.headers.get('cache-control'), 'no-store');
+
+  const src = await res.text();
+  assert.ok(!src.includes('__SHELL_VERSION__'), 'placeholder reached the client');
+
+  const [, version] = src.match(/const SHELL_CACHE = 'opentabs-shell-([^']+)'/);
+  assert.match(version, /^[0-9a-f]{12}$/, `not a hash: ${version}`);
+
+  // Stable across requests, or every load would purge the cache.
+  const again = await (await fetch(`${base}/sw.js`)).text();
+  assert.ok(again.includes(version), 'version changed between requests');
+});

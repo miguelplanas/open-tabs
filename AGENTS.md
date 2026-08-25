@@ -22,11 +22,9 @@ to land on the wrong branch.
 
 Before opening the PR, self-check:
 
-- Did I touch `public/`? Then bump the cache names in `public/sw.js`, or the
-  installed PWA will keep serving stale assets after deploy.
 - Did I redraw an icon? Then bump the `?v=` on every icon URL, in
-  `index.html`, `manifest.webmanifest` and the `sw.js` SHELL list. The cache
-  name above does not help here: the browser keeps favicons in a separate
+  `index.html`, `manifest.webmanifest` and the `sw.js` SHELL list. The service
+  worker cache does not help here: the browser keeps favicons in a separate
   cache keyed by URL, which outlives both a hard refresh and the service
   worker, so the same URL keeps serving the old drawing.
 - Did I add a new directory? Then add it to the Dockerfile `COPY` list
@@ -77,7 +75,12 @@ trace.
 - Node + Hono + better-sqlite3, no build step anywhere. The Node version in
   the Dockerfile is authoritative; CI and local nvm must match it.
 - `server/` is the JSON API (`/api/...`), `public/` is a vanilla-JS SPA (hash
-  routing) served statically.
+  routing) served statically. One exception: `/sw.js` has its own route, which
+  substitutes `__SHELL_VERSION__` with a hash of everything under `public/`
+  before serving it, so a deploy that changed an asset purges the old service
+  worker cache on its own. Nothing to bump by hand; that route has to stay
+  registered ahead of the `serveStatic` catch-all or the placeholder ships to
+  the browser verbatim.
 - SQLite file lives at `OPENTABS_DB` (default `data/opentabs.db`). Tables:
   `songs`, `collections`, the `collection_songs` join table (ordered
   many-to-many; `foreign_keys` pragma is ON for cascade deletes), and

@@ -1,11 +1,19 @@
 // OpenTabs service worker.
 // App shell: stale-while-revalidate, so installed PWAs serve instantly from
 // cache but pick up deployed changes on the next load without anyone having
-// to remember to bump a version string.
+// to remember to bump a version string. The cache name below carries a hash
+// of public/ purely so a deploy that changed something purges the old entries
+// at once instead of after one stale load.
 // Songs API: network-first with cache fallback so the library stays readable
 // offline. Only canonical URLs (/api/songs and /api/songs/:id) are cached to
 // keep the cache bounded; per-keystroke ?q= searches are not stored.
-const SHELL_CACHE = 'opentabs-shell-v21';
+// __SHELL_VERSION__ is substituted by the server with a hash of everything
+// under public/ (see server/index.js). Do not hand-edit it and do not turn it
+// back into a counter: a number that every branch bumps to the same value is
+// a merge conflict on every second PR, and one that a rebase silently drops.
+// Served raw the placeholder is still a valid cache name, so opening this file
+// directly or serving public/ from anything else degrades to one fixed cache.
+const SHELL_CACHE = 'opentabs-shell-__SHELL_VERSION__';
 const API_CACHE = 'opentabs-api-v3';
 const SHELL = [
   '/', '/index.html', '/css/app.css', '/manifest.webmanifest',

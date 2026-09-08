@@ -55,13 +55,26 @@ export function decodeEntities(s) {
     .replaceAll('&amp;', '&');
 }
 
-// Some sources sit behind Cloudflare, which rejects Node's TLS fingerprint but
-// accepts curl's, so pages are fetched through the system curl binary.
-// execFile (no shell) plus each provider's host allowlist keeps this safe.
-export async function curlGet(u) {
-  const args = [
+// Look names up over HTTPS instead of through the container's resolver.
+// In the deployed container every lookup came back SERVFAIL, so online search
+// failed with "Could not resolve host": Tailscale points the host's
+// resolv.conf at 100.100.100.100, which tailscaled serves from the host's
+// network namespace, and a Swarm container never reaches it. The endpoint is
+// an IP literal on purpose, so resolving it needs no working resolver to
+// begin with. Set OPENTABS_DOH to another endpoint, or to an empty string to
+// go back to the system resolver.
+//
+// --doh-url rather than --dns-servers: the latter needs a libcurl built with
+// c-ares, which the image has but a plain Debian curl (local dev) does not.
+const DOH_URL = process.env.OPENTABS_DOH ?? 'https://1.1.1.1/dns-query';
+
+// Exported for the tests: building the argv is the part worth checking, and
+// it stays offline.
+export function curlArgs(u, doh = DOH_URL) {
+  return [
     '-sS', '--compressed', '--max-time', '20',
     '-w', '\n%{http_code}',
+    ...(doh ? ['--doh-url', doh] : []),
     '-A', UA,
     '-H', 'Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
     '-H', 'Accept-Language: en-US,en;q=0.9',
@@ -72,7 +85,13 @@ export async function curlGet(u) {
     '-H', 'Sec-Fetch-User: ?1',
     u.href,
   ];
-  const { stdout } = await execFileAsync('curl', args, {
+}
+
+// Some sources sit behind Cloudflare, which rejects Node's TLS fingerprint but
+// accepts curl's, so pages are fetched through the system curl binary.
+// execFile (no shell) plus each provider's host allowlist keeps this safe.
+export async function curlGet(u) {
+  const { stdout } = await execFileAsync('curl', curlArgs(u), {
     maxBuffer: 20 * 1024 * 1024,
   });
   const nl = stdout.lastIndexOf('\n');

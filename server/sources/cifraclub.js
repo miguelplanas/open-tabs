@@ -2,6 +2,12 @@
 // (solr.sscdn.co), which returns plain JSON; song pages serve the tab inside
 // the first <pre>, with chords wrapped in <b> tags. Both depend on CifraClub's
 // internals and may break if they change them.
+//
+// The song page is a Next.js build: its CSS class names are hashes that
+// change from one deploy to the next, so nothing here matches on them.
+// Title and artist come from the schema.org JSON-LD, the capo from a
+// data-anchor attribute, and a non-standard tuning from the first line of
+// the tab itself.
 
 import { curlGet, decodeEntities } from './lib.js';
 
@@ -35,12 +41,64 @@ export async function search(q) {
     }));
 }
 
-// Strip tags from the <pre> body: chords come as <b>Em7</b> and some pages
-// wrap sections in extra inline markup.
+// Strip tags from the <pre> body: chords come as <b>Em7</b> and every line
+// sits in its own <div>, which keeps its newline inside.
 function cleanBody(pre) {
   return decodeEntities(pre.replace(/<[^>]+>/g, ''))
     .replaceAll('\r\n', '\n')
     .trim();
+}
+
+// "Wonderwall - Oasis - Cifra Club", used when the JSON-LD is missing.
+function fromOgTitle(html) {
+  const og = html.match(/<meta property="og:title" content="([^"]*)"/)?.[1];
+  const parts = decodeEntities(og || '').split(' - ');
+  return parts.length >= 3 ? { title: parts[0], artist: parts[1] } : {};
+}
+
+function fromJsonLd(html) {
+  for (const m of html.matchAll(/<script type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/g)) {
+    let ld;
+    try { ld = JSON.parse(m[1]); } catch { continue; }
+    const types = [].concat(ld['@type']);
+    if (!types.includes('MusicRecording')) continue;
+    const artist = ld.byArtist?.name || '';
+    // name is "Artist - Title".
+    const prefix = artist + ' - ';
+    const title = ld.name?.startsWith(prefix) ? ld.name.slice(prefix.length) : '';
+    return { title, artist };
+  }
+  return {};
+}
+
+// Exported for the tests: everything that depends on the page layout, offline.
+export function parsePage(html) {
+  const pre = html.match(/<pre[^>]*>([\s\S]*?)<\/pre>/)?.[1];
+  if (!pre) throw new Error('page layout changed: no tab <pre> found');
+
+  let body = cleanBody(pre);
+  // Only songs off standard tuning carry this line; it belongs in the tuning
+  // field, not at the top of the tab.
+  let tuning = '';
+  const afi = body.match(/^Afinação:?[ \t]*([^\n]*)\n*/i);
+  if (afi) {
+    tuning = afi[1].trim();
+    body = body.slice(afi[0].length);
+  }
+
+  // <button ... data-anchor="--chord-capo" ...>2ª casa</button>
+  const capoTxt = html.match(/data-anchor="--chord-capo"[^>]*>([^<]*)</)?.[1] || '';
+  const capo = Number(capoTxt.match(/(\d+)\s*ª/)?.[1]) || 0;
+
+  const ld = fromJsonLd(html);
+  const og = fromOgTitle(html);
+  return {
+    title: decodeEntities(ld.title || og.title || '').trim(),
+    artist: decodeEntities(ld.artist || og.artist || '').trim(),
+    body,
+    capo,
+    tuning,
+  };
 }
 
 export async function fetchTab(url) {
@@ -53,24 +111,5 @@ export async function fetchTab(url) {
   if (status < 200 || status >= 300) {
     throw new Error(`HTTP ${status} from cifraclub.com.br`);
   }
-  const pre = html.match(/<pre>([\s\S]*?)<\/pre>/)?.[1];
-  if (!pre) throw new Error('page layout changed: no tab <pre> found');
-
-  const title = html.match(/<h1 class="t1"[^>]*>([^<]+)<\/h1>/)?.[1];
-  const artist = html.match(/<h2 class="t3"[^>]*><a[^>]*>([^<]+)<\/a>/)?.[1];
-  // "Capotraste na <a ...>2ª casa</a>" inside span#cifra_capo.
-  const capoTxt = html.match(/id="cifra_capo"[^>]*>([\s\S]{0,120}?)<\/span>/)?.[1] || '';
-  const capo = Number(capoTxt.replace(/<[^>]+>/g, '').match(/(\d+)\s*ª/)?.[1]) || 0;
-  const tuningTxt = html.match(/id="cifra_afi"[^>]*>([\s\S]{0,120}?)<\/span>/)?.[1] || '';
-  const tuning = decodeEntities(tuningTxt.replace(/<[^>]+>/g, '')).replace(/^Afinação:?\s*/i, '').trim();
-
-  return {
-    title: decodeEntities(title || '').trim(),
-    artist: decodeEntities(artist || '').trim(),
-    body: cleanBody(pre),
-    capo,
-    tuning,
-    source: name,
-    source_url: u.href,
-  };
+  return { ...parsePage(html), source: name, source_url: u.href };
 }

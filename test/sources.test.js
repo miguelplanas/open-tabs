@@ -3,7 +3,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { decodeEntities } from '../server/sources/lib.js';
+import { curlArgs, decodeEntities } from '../server/sources/lib.js';
 import { cleanBody } from '../server/sources/ultimate-guitar.js';
 
 test('decodes named Latin-1 entities used in Spanish/Portuguese titles', () => {
@@ -54,4 +54,29 @@ test('cleanBody removes characters that draw nothing but occupy a column', () =>
   // Soft hyphen and Unicode line separator, both of which UG ships.
   assert.equal(cleanBody('ma&shy;ana'), 'maana');
   assert.equal(cleanBody('one&#8232;two'), 'one\ntwo');
+});
+
+// The container's own resolver answers SERVFAIL (see lib.js), so the fetch has
+// to carry its own way of turning a name into an address.
+test('curlGet resolves over HTTPS instead of the system resolver', () => {
+  const args = curlArgs(new URL('https://www.ultimate-guitar.com/search.php'));
+  const i = args.indexOf('--doh-url');
+  assert.notEqual(i, -1, 'no --doh-url in the curl arguments');
+  // An IP literal: resolving the resolver must not need a resolver.
+  assert.match(args[i + 1], /^https:\/\/\d+\.\d+\.\d+\.\d+\//);
+});
+
+test('the DoH endpoint is configurable, and empty falls back to the system resolver', () => {
+  const u = new URL('https://www.ultimate-guitar.com/search.php');
+  assert.deepEqual(
+    curlArgs(u, 'https://9.9.9.9/dns-query').slice(6, 8),
+    ['--doh-url', 'https://9.9.9.9/dns-query']
+  );
+  assert.equal(curlArgs(u, '').includes('--doh-url'), false);
+});
+
+test('curlArgs still ends with the URL and asks for the status code', () => {
+  const args = curlArgs(new URL('https://tabs.ultimate-guitar.com/tab/x-1'));
+  assert.equal(args.at(-1), 'https://tabs.ultimate-guitar.com/tab/x-1');
+  assert.equal(args[args.indexOf('-w') + 1], '\n%{http_code}');
 });

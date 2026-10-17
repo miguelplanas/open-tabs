@@ -53,6 +53,14 @@ secrets, and succeeds without deploying while any of them is missing:
 mint `tag:ci` keys) and `DOKPLOY_DEPLOY_URL`. The tailnet ACL has to let
 `tag:ci` reach `prod:3000`.
 
+**Monitoring.** Gatus (in the `homelab` repo) checks `http://prod:8080/` every
+minute, and both Gatus and Dokploy (failed builds) send alerts to the owner's
+phone through ntfy. Nothing to configure in this repo.
+
+**Dependencies are updated by hand**, on request. There is no Dependabot or
+Renovate on purpose: single-user app, reachable only from the home network and
+the tailnet, and the owner does not want a stream of update PRs.
+
 **The deploy job waits for the build.** The hook only queues it, so with a
 fourth secret, `DOKPLOY_API_KEY`, the job notes when the newest deployment
 started, pokes the hook, then polls Dokploy until a newer deployment ends in
@@ -116,7 +124,10 @@ trace.
 ## Data: read this before touching anything
 
 - Production data is a SQLite file inside a Docker volume on `prod`, about 600
-  songs. **There is no automated backup yet.**
+  songs. The only backup is the weekly copy of the whole `prod` VM that
+  Proxmox takes on Sundays (the last 3 are kept), so up to a week of changes
+  can be lost. Restoring it rolls back all of `prod`, not just this app; before
+  anything risky to the data, take a fresh copy with `scripts/backup-db.js`.
 - `data/` is gitignored. The local copy is disposable and is never the source
   of truth.
 - The configurable DB path

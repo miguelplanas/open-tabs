@@ -1,0 +1,19 @@
+# Abre PRs semanales con versiones nuevas. Cada grupo llega en un solo PR,
+# y el CI (tests) corre sobre él antes de que decidas mergear.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule: { interval: weekly, day: saturday }
+    groups:
+      npm-menores:
+        update-types: [minor, patch]
+  - package-ecosystem: docker
+    directory: /
+    schedule: { interval: weekly, day: saturday }
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: { interval: weekly, day: saturday }
+    groups:
+      actions:
+        patterns: ["*"]

@@ -9,122 +9,26 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
-          node-version: '22'
+          node-version-file: .nvmrc
           cache: npm
       - run: npm ci
       - run: npm test
         env:
           OPENTABS_DB: /tmp/test.db
 
+  # Merging is deploying: on pushes to main, once test is green. The shared
+  # workflow joins the tailnet (prod has no public address), queues the deploy
+  # and waits until Dokploy reports done or error, so green means live.
   deploy:
-    # Merging is deploying. Only on pushes to main, and only once test is green.
-    #
-    # prod has no public address: it answers on a Tailscale name that resolves
-    # into 100.64.0.0/10, so GitHub cannot reach it from the open internet.
-    # That is why the old deploy job was removed (#3), and why pointing the
-    # Dokploy GitHub App's webhook at http://prod:3000 never delivered. The
-    # fix is to bring the runner into the tailnet as an ephemeral tagged node
-    # instead of exposing prod, then poke Dokploy's deploy hook from inside.
     needs: test
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
-    env:
-      DOKPLOY_APP_ID: pKMvGmcg4Os1w-c5gm-9u
-    steps:
-      # Until the three secrets exist this job succeeds without doing anything,
-      # so an unconfigured repo does not paint main red on every merge.
-      - id: cfg
-        name: Are the deploy secrets configured?
-        env:
-          CLIENT_ID: ${{ secrets.TS_OAUTH_CLIENT_ID }}
-          CLIENT_SECRET: ${{ secrets.TS_OAUTH_SECRET }}
-          DEPLOY_URL: ${{ secrets.DOKPLOY_DEPLOY_URL }}
-        run: |
-          if [ -n "$CLIENT_ID" ] && [ -n "$CLIENT_SECRET" ] && [ -n "$DEPLOY_URL" ]; then
-            echo 'ready=true' >> "$GITHUB_OUTPUT"
-          else
-            echo 'ready=false' >> "$GITHUB_OUTPUT"
-            echo '::notice::Deploy secrets not set yet, skipping the deploy step.'
-          fi
-
-      - name: Join the tailnet
-        if: steps.cfg.outputs.ready == 'true'
-        uses: tailscale/github-action@v3
-        with:
-          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
-          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
-          tags: tag:ci
-
-      # The deploy hook only queues a build, so to report the real outcome the
-      # job remembers when the newest deployment started before poking the hook and later
-      # waits for a newer one to finish. Needs DOKPLOY_API_KEY; without it the
-      # job still deploys but cannot tell whether the build worked.
-      - id: before
-        name: Remember the latest deployment
-        if: steps.cfg.outputs.ready == 'true'
-        env:
-          DEPLOY_URL: ${{ secrets.DOKPLOY_DEPLOY_URL }}
-          API_KEY: ${{ secrets.DOKPLOY_API_KEY }}
-        run: |
-          if [ -z "$API_KEY" ]; then
-            echo '::notice::DOKPLOY_API_KEY not set, the build result will not be checked.'
-            exit 0
-          fi
-          last=$(curl -fsS --max-time 30 -H "x-api-key: $API_KEY" \
-            "${DEPLOY_URL%%/api/*}/api/application.one?applicationId=$DOKPLOY_APP_ID" |
-            jq -r '[.deployments[].createdAt] | max // ""')
-          echo "last=$last" >> "$GITHUB_OUTPUT"
-          echo 'check=true' >> "$GITHUB_OUTPUT"
-
-      - name: Ask Dokploy to redeploy
-        if: steps.cfg.outputs.ready == 'true'
-        env:
-          DEPLOY_URL: ${{ secrets.DOKPLOY_DEPLOY_URL }}
-          REF: ${{ github.ref }}
-        # Dokploy reads the branch out of the webhook payload and refuses
-        # anything that does not match the branch the app is configured with,
-        # so the push event has to be reproduced: an empty POST just earns a
-        # {"message":"Branch Not Match"}.
-        #
-        # That refusal comes back as HTTP 200, so the status code says nothing
-        # about whether a deploy actually started. The body is the only signal,
-        # which is why it is inspected rather than discarded: a deploy that
-        # never ran must not report success.
-        run: |
-          body=$(curl -sS --max-time 60 -X POST "$DEPLOY_URL" \
-            -H 'Content-Type: application/json' \
-            -H 'X-GitHub-Event: push' \
-            -d "{\"ref\":\"$REF\"}")
-          echo "Dokploy answered: $body"
-          case "$body" in
-            *"Not Match"*|*nauthorized*|*"not found"*|*'"error"'*)
-              echo "::error::Dokploy refused the deploy: $body"
-              exit 1
-              ;;
-          esac
-          echo "Deploy queued."
-
-      - name: Wait for the build to finish
-        if: steps.before.outputs.check == 'true'
-        timeout-minutes: 10
-        env:
-          DEPLOY_URL: ${{ secrets.DOKPLOY_DEPLOY_URL }}
-          API_KEY: ${{ secrets.DOKPLOY_API_KEY }}
-          LAST: ${{ steps.before.outputs.last }}
-        run: |
-          while :; do
-            dep=$(curl -fsS --max-time 30 -H "x-api-key: $API_KEY" \
-              "${DEPLOY_URL%%/api/*}/api/application.one?applicationId=$DOKPLOY_APP_ID" |
-              jq -c --arg last "$LAST" '[.deployments[] | select(.createdAt > $last)]
-                | sort_by(.createdAt) | last // empty')
-            status=$(echo "$dep" | jq -r '.status // "queued"')
-            echo "Deployment status: $status"
-            case "$status" in
-              done) echo 'Live in production.'; exit 0 ;;
-              error) echo "::error::Dokploy build failed: $(echo "$dep" | jq -r '.errorMessage // .title')"; exit 1 ;;
-            esac
-            sleep 10
-          done
+    permissions:
+      contents: read
+      id-token: write
+    uses: miguelplanas/ci/.github/workflows/deploy-dokploy.yml@main
+    with:
+      app-id: ${{ vars.DOKPLOY_APP_ID }}
+    secrets: inherit

@@ -1,0 +1,18 @@
+# Required check for auto-merge: PRs touching data, auth, CI or deleting app
+# code wait for the ok-miguel label. See miguelplanas/ci.
+name: guard
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+
+jobs:
+  guard:
+    permissions:
+      pull-requests: read
+    uses: miguelplanas/ci/.github/workflows/guard.yml@main
+    with:
+      # server/db.js holds the schema; the import scripts write to the library.
+      extra: |
+        ^server/db\.js$
+        ^scripts/import-

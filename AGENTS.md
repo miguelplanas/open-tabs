@@ -13,8 +13,18 @@ Every change, however small, follows this path:
 3. `npm test` green **before** committing.
 4. Explicit `git add <file>`. **Never `git commit -am`**: it stages every
    tracked modified file, not just the one you touched.
-5. `gh pr create --fill`.
-6. **Do not merge.** Merging is the owner's decision (see Deployment).
+5. `gh pr create --fill`, then `gh pr merge --auto --squash` unless the
+   change is an exception (below).
+
+**Auto-merge and its exceptions.** With `--auto`, GitHub merges the PR as soon
+as `test` and `guard / check` pass, and merging is deploying. These still wait
+for the owner: schema migrations or changes to stored data (`server/db.js`,
+write paths, the import scripts), auth and sessions, and removing features.
+The `guard` check enforces it: it fails when a PR touches those paths, the CI
+(`.github/`), or deletes app files, until the owner adds the `ok-miguel`
+label. **An agent never adds or removes that label**, and never edits
+`guard.yml` to get around it. For an exception, open the PR, say in the
+description what needs review and why, and do not enable `--auto` if in doubt.
 
 Chain shell commands with `&&`. Bash does not stop when a line fails, and a
 failed `git switch -c` followed by unchained commands has already caused work
@@ -36,43 +46,36 @@ Before opening the PR, self-check:
 `main` -> CI -> Tailscale -> Dokploy -> Docker Swarm on the `prod` VM.
 
 **Merging is deploying.** There is no staging environment. A merged PR is live
-in about two minutes. This is why step 6 above exists.
+in about two minutes at `https://open-tabs.miguelplanas.dev` (home network and
+tailnet only). This is why tests are the only safety net.
 
 CI (`.github/workflows/ci.yml`) runs `test` on pull requests and on pushes to
-`main`; the ruleset requires it to pass before a merge is allowed. On pushes
-to `main` only, a second `deploy` job then calls Dokploy's deploy hook.
+`main`; the ruleset requires it and `guard / check` to pass before a merge.
+On pushes to `main` only, the `deploy` job calls the shared workflow in
+`miguelplanas/ci`, which every app uses, so fix deploy logic there, not here.
 
 **A webhook from GitHub cannot work here, so do not try to reinstate one.**
 `prod` answers on a Tailscale name that resolves into `100.64.0.0/10`, which
 is not routable from the internet, so GitHub's delivery attempts fail with
 "failed to connect to host". The deploy job gets around this by joining the
-tailnet as an ephemeral node tagged `tag:ci` and calling the hook from inside
-the network, rather than by exposing `prod`. It needs three repository
-secrets, and succeeds without deploying while any of them is missing:
-`TS_OAUTH_CLIENT_ID`, `TS_OAUTH_SECRET` (a Tailscale OAuth client that can
-mint `tag:ci` keys) and `DOKPLOY_DEPLOY_URL`. The tailnet ACL has to let
+tailnet as an ephemeral node tagged `tag:ci` and calling the Dokploy API from
+inside the network, rather than by exposing `prod`. Secrets:
+`DOKPLOY_API_KEY`, `TS_OAUTH_CLIENT_ID` plus `TS_AUDIENCE` (workload identity)
+or `TS_OAUTH_SECRET`; variable `DOKPLOY_APP_ID`. The tailnet ACL has to let
 `tag:ci` reach `prod:3000`.
 
-**Monitoring.** Gatus (in the `homelab` repo) checks `http://prod:8080/` every
-minute, and both Gatus and Dokploy (failed builds) send alerts to the owner's
-phone through ntfy. Nothing to configure in this repo.
+**Monitoring.** Gatus (in the `homelab` repo) checks
+`https://open-tabs.miguelplanas.dev/health` every minute, and both Gatus and
+Dokploy (failed builds) send alerts to the owner's phone through ntfy. Nothing to configure in this repo.
 
 **Dependencies are updated by hand**, on request. There is no Dependabot or
 Renovate on purpose: single-user app, reachable only from the home network and
 the tailnet, and the owner does not want a stream of update PRs.
 
-**The deploy job waits for the build.** The hook only queues it, so with a
-fourth secret, `DOKPLOY_API_KEY`, the job notes when the newest deployment
-started, pokes the hook, then polls Dokploy until a newer deployment ends in
-`done` (green) or `error` (red, with Dokploy's message). Without that secret it
-still deploys but cannot tell whether the build worked.
-
-**Dokploy answers 200 even when it refuses to deploy.** It reads the branch
-out of the webhook payload, so the call has to reproduce a push event
-(`X-GitHub-Event: push` and a body carrying `ref`); an empty POST earns a
-`{"message":"Branch Not Match"}` with a 200 attached. The status code is
-therefore worthless as a signal and the deploy step parses the body instead.
-Keep it that way: the failure mode this guards against is a green pipeline
+**The deploy job waits for the build.** Dokploy answers as soon as it queues
+a deploy, so the shared workflow notes the newest deployment, starts a new one
+and polls until that one ends in `done` (green) or `error` (red, with
+Dokploy's message). The failure mode this guards against is a green pipeline
 that deployed nothing.
 
 **Ship through GitHub, never straight at `prod`.** This is a working rule, not

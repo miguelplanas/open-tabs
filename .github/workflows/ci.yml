@@ -31,6 +31,8 @@ jobs:
     needs: test
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    env:
+      DOKPLOY_APP_ID: pKMvGmcg4Os1w-c5gm-9u
     steps:
       # Until the three secrets exist this job succeeds without doing anything,
       # so an unconfigured repo does not paint main red on every merge.
@@ -55,6 +57,27 @@ jobs:
           oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
           oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
           tags: tag:ci
+
+      # The deploy hook only queues a build, so to report the real outcome the
+      # job remembers when the newest deployment started before poking the hook and later
+      # waits for a newer one to finish. Needs DOKPLOY_API_KEY; without it the
+      # job still deploys but cannot tell whether the build worked.
+      - id: before
+        name: Remember the latest deployment
+        if: steps.cfg.outputs.ready == 'true'
+        env:
+          DEPLOY_URL: ${{ secrets.DOKPLOY_DEPLOY_URL }}
+          API_KEY: ${{ secrets.DOKPLOY_API_KEY }}
+        run: |
+          if [ -z "$API_KEY" ]; then
+            echo '::notice::DOKPLOY_API_KEY not set, the build result will not be checked.'
+            exit 0
+          fi
+          last=$(curl -fsS --max-time 30 -H "x-api-key: $API_KEY" \
+            "${DEPLOY_URL%%/api/*}/api/application.one?applicationId=$DOKPLOY_APP_ID" |
+            jq -r '[.deployments[].createdAt] | max // ""')
+          echo "last=$last" >> "$GITHUB_OUTPUT"
+          echo 'check=true' >> "$GITHUB_OUTPUT"
 
       - name: Ask Dokploy to redeploy
         if: steps.cfg.outputs.ready == 'true'
@@ -82,4 +105,26 @@ jobs:
               exit 1
               ;;
           esac
-          echo "Deploy queued. It is live once Dokploy finishes the build."
+          echo "Deploy queued."
+
+      - name: Wait for the build to finish
+        if: steps.before.outputs.check == 'true'
+        timeout-minutes: 10
+        env:
+          DEPLOY_URL: ${{ secrets.DOKPLOY_DEPLOY_URL }}
+          API_KEY: ${{ secrets.DOKPLOY_API_KEY }}
+          LAST: ${{ steps.before.outputs.last }}
+        run: |
+          while :; do
+            dep=$(curl -fsS --max-time 30 -H "x-api-key: $API_KEY" \
+              "${DEPLOY_URL%%/api/*}/api/application.one?applicationId=$DOKPLOY_APP_ID" |
+              jq -c --arg last "$LAST" '[.deployments[] | select(.createdAt > $last)]
+                | sort_by(.createdAt) | last // empty')
+            status=$(echo "$dep" | jq -r '.status // "queued"')
+            echo "Deployment status: $status"
+            case "$status" in
+              done) echo 'Live in production.'; exit 0 ;;
+              error) echo "::error::Dokploy build failed: $(echo "$dep" | jq -r '.errorMessage // .title')"; exit 1 ;;
+            esac
+            sleep 10
+          done

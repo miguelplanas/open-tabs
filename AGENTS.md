@@ -53,6 +53,12 @@ secrets, and succeeds without deploying while any of them is missing:
 mint `tag:ci` keys) and `DOKPLOY_DEPLOY_URL`. The tailnet ACL has to let
 `tag:ci` reach `prod:3000`.
 
+**The deploy job waits for the build.** The hook only queues it, so with a
+fourth secret, `DOKPLOY_API_KEY`, the job notes when the newest deployment
+started, pokes the hook, then polls Dokploy until a newer deployment ends in
+`done` (green) or `error` (red, with Dokploy's message). Without that secret it
+still deploys but cannot tell whether the build worked.
+
 **Dokploy answers 200 even when it refuses to deploy.** It reads the branch
 out of the webhook payload, so the call has to reproduce a push event
 (`X-GitHub-Event: push` and a body carrying `ref`); an empty POST earns a

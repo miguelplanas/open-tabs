@@ -62,7 +62,7 @@ code { font-family: var(--font-mono); font-size: 0.9em; }
 /* Segunda fila dentro de la cabecera fija (p. ej. Songs/Collections), para
    que se quede con el título en vez de irse con .content. */
 .topbar-row { display: flex; align-items: center; gap: var(--s2); flex: 0 0 100%; }
-.topbar .sub { display: block; color: var(--ink-2); font-size: var(--text-sm); font-weight: 400; letter-spacing: 0; }
+.topbar .sub { display: block; color: var(--ink-2); font-size: var(--text-sm); font-weight: 400; letter-spacing: 0; line-height: 1.4; }
 
 /* --- Botones: la base pone .btn, .primary y .quiet; aquí las variantes --- */
 .btn { color: var(--ink); }

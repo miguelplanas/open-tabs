@@ -46,7 +46,7 @@
   tapping opens a picker labelled by kind, capo and tuning, and the reader can
   switch version from its tools sheet. Kind (`chords`/`tabs`/`lyrics`) is
   derived server-side on every write. 51 such groups in the restored library.
-  Follows `docs/superpowers/specs/2026-07-05-agrupar-versiones-cancion-design.md`,
+  Follows `docs/specs/2026-07-05-agrupar-versiones-cancion-design.md`,
   except the labels are in English to match the rest of the interface.
 
 - [x] **No source badge in the song list.** Provenance is still stored, it is

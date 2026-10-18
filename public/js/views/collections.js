@@ -1,6 +1,7 @@
 import { $app, api, h, escapeHtml } from '../app.js';
 import { icon } from '../icons.js';
 import { promptDialog, segmentNav, toast } from '../ui.js';
+import { visibleDescription } from '../collection-text.js';
 
 // Top-level list of collections (folders/albums/setlists).
 export async function collectionsView() {
@@ -38,12 +39,14 @@ export async function collectionsView() {
     }
     $list.innerHTML = '';
     for (const c of cols) {
+      const desc = visibleDescription(c.description);
       const li = h(`
-        <li><a href="#/collection/${c.id}">
-          <div class="title">${escapeHtml(c.name)}
-            <span class="count">${c.song_count} ${c.song_count === 1 ? 'song' : 'songs'}</span>
+        <li><a class="row-split" href="#/collection/${c.id}">
+          <div class="row-main">
+            <div class="title">${escapeHtml(c.name)}</div>
+            ${desc ? `<div class="meta">${escapeHtml(desc)}</div>` : ''}
           </div>
-          ${c.description ? `<div class="meta">${escapeHtml(c.description)}</div>` : ''}
+          <span class="row-end">${c.song_count} ${c.song_count === 1 ? 'song' : 'songs'}</span>
         </a></li>`);
       $list.append(li);
     }

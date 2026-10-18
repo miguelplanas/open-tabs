@@ -102,8 +102,9 @@ select.btn, select.btn:hover {
 .searchbox:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
 .searchbox::placeholder { color: var(--ink-3); }
 
-.toolbar { display: flex; gap: var(--s2); margin-bottom: var(--s3); }
-.toolbar .btn { font-size: var(--text-sm); }
+.toolbar { display: flex; flex-wrap: wrap; gap: var(--s2); margin-bottom: var(--s3); }
+.toolbar .btn { font-size: var(--text-sm); padding: 0 var(--s3); white-space: nowrap; }
+.toolbar select.btn { padding-right: calc(var(--s3) + 18px); }
 
 .chips { display: flex; gap: var(--s2); flex-wrap: wrap; margin-bottom: var(--s3); }
 .chip {
@@ -547,6 +548,8 @@ label.f > * { margin-top: var(--s1); color: var(--ink); }
   min-width: var(--tap); min-height: var(--tap);
 }
 .btn.icon .i, .reader-dock .btn.play .i { width: 22px; height: 22px; }
+/* Botón con icono y texto: en una línea, el icono pegado al texto. */
+.btn:not(.icon):has(> .i) { display: inline-flex; align-items: center; justify-content: center; gap: var(--s1); white-space: nowrap; }
 .btn:not(.icon) > .i { width: 18px; height: 18px; margin-inline-start: -2px; }
 .picker-check .i { width: 16px; height: 16px; }
 .rating .i { width: 14px; height: 14px; vertical-align: -0.15em; }

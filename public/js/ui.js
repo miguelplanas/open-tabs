@@ -61,13 +61,13 @@ export function tuningLabel(tuning) {
   return STANDARD_TUNINGS.has(t.toLowerCase()) ? '' : t;
 }
 
-// How one version reads in the picker: "Chords · capo 2 · Drop D".
+// How one version reads in the picker: "Chords, capo 2, Drop D".
 export function versionLabel(song) {
   const bits = [kindLabel(song.kind)];
   if (song.capo) bits.push(`capo ${song.capo}`);
   const tuning = tuningLabel(song.tuning);
   if (tuning) bits.push(tuning);
-  return bits.join(' · ');
+  return bits.join(', ');
 }
 
 // Choose which version of a song to open. Shared by the library (tapping a
@@ -78,7 +78,7 @@ export function versionPickerDialog(versions, { currentId = null } = {}) {
   const overlay = h(`
     <div class="confirm-overlay">
       <div class="confirm-box picker" role="dialog" aria-modal="true">
-        <p>${escapeHtml(top.title)}<span class="count"> · ${
+        <p>${escapeHtml(top.title)}<span class="count">, ${
           escapeHtml(top.artist || 'Unknown artist')}</span></p>
         <ul class="picker-list" id="vp-list"></ul>
         <div class="confirm-actions">
@@ -396,7 +396,7 @@ export async function addToCollectionDialog(song) {
   function renderRow(col) {
     const row = h(`
       <li class="picker-row${col.member ? ' member' : ''}">
-        <span class="picker-name">${escapeHtml(col.name)}<span class="count"> · ${col.song_count}</span></span>
+        <span class="picker-name">${escapeHtml(col.name)}<span class="count"> [${col.song_count}]</span></span>
         <span class="picker-check">${icon(col.member ? 'check' : 'plus')}</span>
       </li>`);
     row.onclick = async () => {

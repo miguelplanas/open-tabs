@@ -165,6 +165,10 @@ select.btn, select.btn:hover {
 
 /* --- Colecciones --- */
 .col-desc { color: var(--ink-2); font-size: var(--text-sm); margin: 0 0 var(--s3); }
+/* Fila con su dato a la derecha (número de canciones de una colección). */
+.songlist li a.row-split { display: flex; align-items: center; gap: var(--s3); }
+.row-main { flex: 1; min-width: 0; }
+.row-end { flex: none; color: var(--ink-3); font-size: var(--text-sm); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .col-song { display: flex; align-items: stretch; gap: var(--s2); border-bottom: 1px solid var(--line); }
 .songlist .col-song .col-song-main { flex: 1; min-width: 0; border-bottom: none; }
 .col-song.editing .col-song-main { pointer-events: none; }

@@ -2,6 +2,7 @@ import { $app, api, escapeHtml, warmSong } from '../app.js';
 import { icon } from '../icons.js';
 import { renderBody } from '../chords.js';
 import { toast, confirmDialog } from '../ui.js';
+import { oneAtATime } from '../busy.js';
 
 // Handles #/new (no id), #/edit/:id, and imports handed over from the
 // online search view via sessionStorage.
@@ -77,23 +78,25 @@ export async function editorView([id]) {
     }
   };
 
-  async function save() {
+  // One request at a time: a double tap on Save created the song twice.
+  const $save = document.getElementById('save');
+  const send = oneAtATime($save, async (data) => {
+    const saved = id
+      ? await api('/songs/' + id, { method: 'PUT', body: data })
+      : await api('/songs', { method: 'POST', body: data });
+    warmSong(saved.id); // refresh the offline copy
+    location.hash = '#/song/' + saved.id;
+  });
+
+  function save() {
     const data = Object.fromEntries(new FormData($form));
     data.capo = Number(data.capo) || 0;
     if (!data.title.trim()) { $form.elements.title.focus(); return; }
     // Preserve provenance when editing an imported song.
     if (song.source) { data.source = song.source; data.source_url = song.source_url; }
-    try {
-      const saved = id
-        ? await api('/songs/' + id, { method: 'PUT', body: data })
-        : await api('/songs', { method: 'POST', body: data });
-      warmSong(saved.id); // refresh the offline copy
-      location.hash = '#/song/' + saved.id;
-    } catch (err) {
-      toast('Save failed: ' + err.message, { danger: true });
-    }
+    send(data).catch((err) => toast('Save failed: ' + err.message, { danger: true }));
   }
-  document.getElementById('save').onclick = save;
+  $save.onclick = save;
   $form.onsubmit = (e) => { e.preventDefault(); save(); };
 
   const $del = document.getElementById('delete');

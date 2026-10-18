@@ -16,7 +16,7 @@
 const SHELL_CACHE = 'opentabs-shell-__SHELL_VERSION__';
 const API_CACHE = 'opentabs-api-v3';
 const SHELL = [
-  '/', '/index.html', '/css/app.css', '/manifest.webmanifest',
+  '/', '/index.html', '/css/base.css', '/css/app.css', '/manifest.webmanifest',
   '/js/app.js', '/js/nav.js', '/js/chords.js', '/js/ui.js', '/js/chord-shapes.js',
   '/js/icons.js', '/js/busy.js',
   '/js/views/library.js', '/js/views/reader.js', '/js/views/editor.js',

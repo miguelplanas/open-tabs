@@ -63,6 +63,18 @@ test('transposeChord shifts roots and bass notes', () => {
   assert.equal(transposeChord('E7(#5)', 2), 'F#7(#5)');
 });
 
+test('transposeChord handles enharmonic roots Cb, B#, Fb and E#', () => {
+  assert.equal(transposeChord('Cb', 1), 'C');
+  assert.equal(transposeChord('B#', 1), 'C#');
+  assert.equal(transposeChord('Fb', 2), 'Gb');
+  assert.equal(transposeChord('E#m', 1), 'F#m');
+  assert.equal(transposeChord('Cbmaj7/Fb', 1), 'Cmaj7/F');
+  assert.equal(transposeChord('A/E#', -1), 'G#/E');
+  for (const c of ['Cb', 'B#', 'Fb', 'E#']) {
+    for (let s = -11; s <= 11; s++) assert.doesNotMatch(transposeChord(c, s), /undefined/);
+  }
+});
+
 test('transposeChord keeps flat spelling when the chord is written flat', () => {
   assert.equal(transposeChord('Bb', 2), 'C');
   assert.equal(transposeChord('Db', 1), 'D');

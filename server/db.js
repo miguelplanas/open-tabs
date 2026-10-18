@@ -1,4 +1,4 @@
-import Database from 'better-sqlite3';
+import { DatabaseSync } from 'node:sqlite';
 import { mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -11,10 +11,25 @@ export const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const DB_PATH = resolve(ROOT, process.env.OPENTABS_DB || 'data/opentabs.db');
 mkdirSync(dirname(DB_PATH), { recursive: true });
 
-export const db = new Database(DB_PATH);
-db.pragma('journal_mode = WAL');
+export const db = new DatabaseSync(DB_PATH);
+db.exec('PRAGMA journal_mode = WAL');
 // Needed for ON DELETE CASCADE on collection membership (off by default in SQLite).
-db.pragma('foreign_keys = ON');
+db.exec('PRAGMA foreign_keys = ON');
+// Concurrent writers (a backup run, a script) wait instead of failing at once.
+db.exec('PRAGMA busy_timeout = 5000');
+
+// Runs fn inside one transaction: all of its writes land, or none do.
+export function transaction(fn) {
+  db.exec('BEGIN');
+  try {
+    const result = fn();
+    db.exec('COMMIT');
+    return result;
+  } catch (err) {
+    db.exec('ROLLBACK');
+    throw err;
+  }
+}
 
 // Lets searches ignore case and accents (SQLite's LIKE only case-folds ASCII,
 // so "garcia" wouldn't otherwise match "García"). Used as norm(col) LIKE
@@ -92,18 +107,18 @@ if (!songCols.includes('kind')) {
 const unclassified = db.prepare("SELECT id, body FROM songs WHERE kind = ''").all();
 if (unclassified.length) {
   const setKind = db.prepare('UPDATE songs SET kind = ? WHERE id = ?');
-  db.transaction(() => {
+  transaction(() => {
     for (const s of unclassified) setKind.run(detectKind(s.body), s.id);
-  })();
+  });
 }
 
 // One-time: bring songs still sitting on the old 20 px/s default down to the
 // gentler baseline. Guarded by user_version so a speed the owner deliberately
 // sets to 20 later is never clobbered on the next startup.
-if (db.pragma('user_version', { simple: true }) < 1) {
+if (db.prepare('PRAGMA user_version').get().user_version < 1) {
   db.prepare('UPDATE songs SET scroll_speed = ? WHERE scroll_speed = 20')
     .run(DEFAULT_SCROLL_SPEED);
-  db.pragma('user_version = 1');
+  db.exec('PRAGMA user_version = 1');
 }
 
 // Sessions older than a year are expired; prune on startup.

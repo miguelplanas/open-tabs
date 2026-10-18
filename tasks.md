@@ -54,7 +54,7 @@
 
 ## Next up
 
-- [ ] Backups: nightly `sqlite3 .backup` (or `better-sqlite3`'s `db.backup()`)
+- [ ] Backups: nightly `sqlite3 .backup` (or `scripts/backup-db.js`)
   to a dated file, with retention. Now that the library is real data again,
   this is the most urgent item on the list.
 - [ ] `/healthz` endpoint plus a systemd unit for the Proxmox LXC.

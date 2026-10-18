@@ -22,7 +22,7 @@
 
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { db, ROOT, DEFAULT_SCROLL_SPEED } from '../server/db.js';
+import { db, ROOT, DEFAULT_SCROLL_SPEED, transaction } from '../server/db.js';
 import { readCookie, fetchPage, jsStore } from './ug-lib.js';
 import { parseTab, name as SOURCE } from '../server/sources/ultimate-guitar.js';
 
@@ -232,9 +232,9 @@ for (const [i, { entry, buckets }] of items.entries()) {
 // library's default sort reproduces the UG order exactly however many resumed
 // runs it took to get here. Newest first, one second apart.
 const base = Date.now();
-db.transaction(() => {
+transaction(() => {
   items.forEach((it, i) => setUpdated.run(sqlTime(base - i * 1000), it.entry.url));
-})();
+});
 
 const report = {
   ran_at: new Date().toISOString(),

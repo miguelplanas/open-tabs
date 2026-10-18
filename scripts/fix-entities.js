@@ -13,7 +13,7 @@
 // (see scripts/import-ug.js), and repairing text is not a reason to reshuffle
 // 103 songs to the top of the list. kind is recomputed because the body changed.
 
-import { db } from '../server/db.js';
+import { db, transaction } from '../server/db.js';
 import { cleanBody } from '../server/sources/ultimate-guitar.js';
 import { detectKind } from '../public/js/chords.js';
 
@@ -52,9 +52,9 @@ if (!GO) {
 }
 
 const update = db.prepare('UPDATE songs SET body = ?, kind = ? WHERE id = ?');
-db.transaction(() => {
+transaction(() => {
   for (const w of work) update.run(w.body, w.newKind, w.id);
-})();
+});
 
 const left = db.prepare('SELECT COUNT(*) AS n FROM songs WHERE body LIKE ?').get('%&%');
 console.log(`\nrewrote ${work.length} songs. Songs still containing an ampersand: ${left.n} (literal ones are fine).`);

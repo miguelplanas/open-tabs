@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { db } from './db.js';
+import { db, transaction } from './db.js';
 
 export const collections = new Hono();
 
@@ -160,10 +160,9 @@ collections.put('/:id/songs', async (c) => {
   const setPos = db.prepare(
     'UPDATE collection_songs SET position = ? WHERE collection_id = ? AND song_id = ?'
   );
-  const tx = db.transaction(() => {
+  transaction(() => {
     final.forEach((songId, i) => setPos.run(i, id, songId));
     touch(id);
   });
-  tx();
   return c.json({ ok: true });
 });

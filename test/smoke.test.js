@@ -16,7 +16,7 @@ import { readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import Database from 'better-sqlite3';
+import { DatabaseSync } from 'node:sqlite';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const DB_PATH = join(tmpdir(), `opentabs-smoke-${process.pid}-${Date.now()}.db`);
@@ -91,7 +91,7 @@ after(() => {
 });
 
 test('creates the database file with the expected schema', () => {
-  const db = new Database(DB_PATH, { readonly: true });
+  const db = new DatabaseSync(DB_PATH, { readOnly: true });
   try {
     const tables = db
       .prepare("SELECT name FROM sqlite_master WHERE type = 'table'")

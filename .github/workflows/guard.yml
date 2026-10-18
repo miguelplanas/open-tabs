@@ -10,6 +10,7 @@ jobs:
   guard:
     permissions:
       pull-requests: read
+      statuses: write
     uses: miguelplanas/ci/.github/workflows/guard.yml@main
     with:
       # server/db.js holds the schema; the import scripts write to the library.

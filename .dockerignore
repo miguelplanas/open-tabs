@@ -12,3 +12,6 @@ docs/
 deploy/
 test/
 tasks.md
+.agents/
+.opencode/
+.playwright-cli/

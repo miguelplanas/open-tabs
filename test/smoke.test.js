@@ -233,3 +233,34 @@ test('/sw.js is served with the shell version substituted', async () => {
   const again = await (await fetch(`${base}/sw.js`)).text();
   assert.ok(again.includes(version), 'version changed between requests');
 });
+
+// Responses are compressed (server/index.js): /api/songs is the bulk of a
+// library load on a phone and shrinks about 8x. fetch() decodes the body on
+// its own, so the header is what proves it, and the parsed body proves the
+// encoding is valid.
+test('compresses the API, static files and /sw.js when the client accepts gzip', async () => {
+  for (const path of ['/api/songs', '/css/app.css', '/js/app.js', '/sw.js']) {
+    const res = await fetch(`${base}${path}`, { headers: { 'Accept-Encoding': 'gzip' } });
+    assert.equal(res.status, 200, path);
+    assert.equal(res.headers.get('content-encoding'), 'gzip', path);
+    const body = await res.text();
+    assert.ok(body.length > 0, path);
+    if (path === '/api/songs') assert.ok(Array.isArray(JSON.parse(body)));
+    if (path === '/sw.js') assert.ok(!body.includes('__SHELL_VERSION__'));
+  }
+});
+
+test('sends plain bodies to clients that do not accept compression', async () => {
+  const res = await fetch(`${base}/css/app.css`, { headers: { 'Accept-Encoding': 'identity' } });
+  assert.equal(res.status, 200);
+  assert.equal(res.headers.get('content-encoding'), null);
+});
+
+test('leaves range requests uncompressed so the slice stays valid', async () => {
+  const res = await fetch(`${base}/css/app.css`, {
+    headers: { 'Accept-Encoding': 'gzip', Range: 'bytes=0-9' },
+  });
+  assert.equal(res.status, 206);
+  assert.equal(res.headers.get('content-encoding'), null);
+  assert.equal((await res.text()).length, 10);
+});

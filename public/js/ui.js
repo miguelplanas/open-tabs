@@ -1,4 +1,5 @@
 import { h, escapeHtml, api } from './app.js';
+import { icon } from './icons.js';
 
 let toastRoot;
 function toastStack() {
@@ -106,7 +107,7 @@ export function versionPickerDialog(versions, { currentId = null } = {}) {
     const row = h(`
       <li class="picker-row${current ? ' member' : ''}">
         <span class="picker-name">${escapeHtml(versionLabel(v))}</span>
-        ${current ? '<span class="picker-check">✓</span>' : ''}
+        ${current ? `<span class="picker-check">${icon('check')}</span>` : ''}
       </li>`);
     row.onclick = () => {
       close();
@@ -234,7 +235,7 @@ export function songActionsSheet(versions, { extra = [], onDeleted } = {}) {
       const row = h(`
         <li class="picker-row${current ? ' member' : ''}">
           <span class="picker-name">${escapeHtml(versionLabel(v))}</span>
-          ${current ? '<span class="picker-check">✓</span>' : ''}
+          ${current ? `<span class="picker-check">${icon('check')}</span>` : ''}
         </li>`);
       row.onclick = () => { song = v; renderVersions(); };
       $versions.append(row);
@@ -370,7 +371,7 @@ export async function addToCollectionDialog(song) {
       <div class="confirm-box picker" role="dialog" aria-modal="true">
         <p>Add <strong>${escapeHtml(song.title)}</strong> to…</p>
         <ul class="picker-list" id="pk-list"></ul>
-        <button type="button" class="btn picker-new" id="pk-new">+ New collection</button>
+        <button type="button" class="btn picker-new" id="pk-new">${icon('plus')} New collection</button>
         <div class="confirm-actions">
           <button type="button" class="btn primary" id="pk-done">Done</button>
         </div>
@@ -396,7 +397,7 @@ export async function addToCollectionDialog(song) {
     const row = h(`
       <li class="picker-row${col.member ? ' member' : ''}">
         <span class="picker-name">${escapeHtml(col.name)}<span class="count"> · ${col.song_count}</span></span>
-        <span class="picker-check">${col.member ? '✓' : '+'}</span>
+        <span class="picker-check">${icon(col.member ? 'check' : 'plus')}</span>
       </li>`);
     row.onclick = async () => {
       const wasMember = col.member;

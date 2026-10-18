@@ -1,4 +1,5 @@
 import { $app, api, h, escapeHtml } from '../app.js';
+import { icon } from '../icons.js';
 import { promptDialog, confirmDialog, toast, onLongPress, songActionsSheet } from '../ui.js';
 
 const SETLIST_KEY = 'opentabs.setlist';
@@ -20,15 +21,15 @@ export async function collectionView([id]) {
 
   $app.innerHTML = `
     <header class="topbar">
-      <button class="btn icon" id="back" title="Back">←</button>
+      <button class="btn icon" id="back" title="Back" aria-label="Back">${icon('chevron-left')}</button>
       <h1 id="title"></h1>
-      <button class="btn icon" id="rename" title="Rename">✏️</button>
+      <button class="btn icon" id="rename" title="Rename" aria-label="Rename">${icon('pencil')}</button>
     </header>
     <main class="content">
       <p class="col-desc" id="desc" hidden></p>
       <div class="toolbar">
-        <button class="btn primary" id="play" title="Play through">▶ Play through</button>
-        <button class="btn" id="add">+ Add songs</button>
+        <button class="btn primary" id="play" title="Play through">${icon('play', { cls: 'fill' })} Play through</button>
+        <button class="btn" id="add">${icon('plus')} Add songs</button>
         <button class="btn" id="edit-toggle" aria-pressed="false">Reorder</button>
       </div>
       <ul class="songlist" id="list"></ul>
@@ -60,9 +61,9 @@ export async function collectionView([id]) {
     col.songs.forEach((s, i) => {
       const controls = editing
         ? `<div class="row-ctrl">
-             <button class="btn icon reorder" data-act="up" ${i === 0 ? 'disabled' : ''} title="Move up">↑</button>
-             <button class="btn icon reorder" data-act="down" ${i === col.songs.length - 1 ? 'disabled' : ''} title="Move down">↓</button>
-             <button class="btn icon reorder danger" data-act="remove" title="Remove">✕</button>
+             <button class="btn icon reorder" data-act="up" ${i === 0 ? 'disabled' : ''} title="Move up" aria-label="Move up">${icon('arrow-up')}</button>
+             <button class="btn icon reorder" data-act="down" ${i === col.songs.length - 1 ? 'disabled' : ''} title="Move down" aria-label="Move down">${icon('arrow-down')}</button>
+             <button class="btn icon reorder danger" data-act="remove" title="Remove" aria-label="Remove">${icon('x')}</button>
            </div>`
         : '';
       const li = h(`
@@ -231,7 +232,7 @@ export async function collectionView([id]) {
         const row = h(`
           <li class="picker-row${member ? ' member' : ''}">
             <span class="picker-name">${escapeHtml(s.title)}<span class="count"> · ${escapeHtml(s.artist || 'Unknown')}</span></span>
-            <span class="picker-check">${member ? '✓' : '+'}</span>
+            <span class="picker-check">${icon(member ? 'check' : 'plus')}</span>
           </li>`);
         row.onclick = async () => {
           row.style.pointerEvents = 'none';

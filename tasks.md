@@ -2,6 +2,16 @@
 
 ## Done
 
+- [x] **Turn the page with a keyboard or a Bluetooth pedal.** In the reader,
+  PageDown, ArrowDown, ArrowRight and Enter go forward one screen; PageUp,
+  ArrowUp and ArrowLeft go back (two lines overlap so you keep your place).
+  At the end of a song in a setlist, forward opens the next one; at the top,
+  back opens the previous one. Space still toggles autoscroll, and autoscroll
+  keeps running from the new position. Keys are ignored while typing, with a
+  sheet open or with a modifier held. Note: on iOS 18.4+ pedals that pair as
+  keyboard plus mouse deliver no keydown (WebKit bug 301563), so put the
+  pedal in keyboard-only mode. `reader.js`, `chords.js` (`pageStep`).
+
 - [x] **Keep the screen on for the whole song.** The wake lock used to be tied
   to autoscroll, so reaching the last line released it and the phone locked
   mid-song. It is now held for as long as the reader is open (re-acquired on

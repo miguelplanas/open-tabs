@@ -6,6 +6,7 @@ import { previewView } from './views/preview.js';
 import { collectionsView } from './views/collections.js';
 import { collectionView } from './views/collection.js';
 import { loginView } from './views/login.js';
+import { createNav } from './nav.js';
 
 export const $app = document.getElementById('app');
 
@@ -57,7 +58,7 @@ const routes = [
 ];
 
 let teardown = null;
-let navSeq = 0;
+const nav = createNav();
 
 // List views remember where you left them: opening a song from halfway down
 // the library and coming back should not dump you at the top of the list
@@ -77,11 +78,11 @@ function restoreScroll(hash, seq) {
   window.scrollTo(0, y);
   // A view can still be growing on the frame it returns (late list rows, the
   // reader's font fitting), so aim once more once layout settles.
-  if (y) requestAnimationFrame(() => { if (seq === navSeq) window.scrollTo(0, y); });
+  if (y) requestAnimationFrame(() => { if (seq === nav.current()) window.scrollTo(0, y); });
 }
 
 async function route() {
-  const my = ++navSeq;
+  const my = nav.begin();
   if (lastHash && KEEPS_SCROLL.test(lastHash)) scrollMemo.set(lastHash, window.scrollY);
   if (typeof teardown === 'function') teardown();
   teardown = null;
@@ -90,11 +91,13 @@ async function route() {
     const m = hash.match(r.re);
     if (m) {
       const td = await r.view(m.slice(1));
-      if (my !== navSeq) {
-        // A newer navigation won while this view was loading: discard it and
-        // repaint the current route in case this one drew over it.
+      const outcome = nav.settle(my);
+      if (outcome !== 'commit') {
+        // Another navigation overlapped this one: discard this view and, once
+        // the newest has finished, repaint the current route in case a stale
+        // view drew over it. See nav.js for why never before.
         if (typeof td === 'function') td();
-        route();
+        if (outcome === 'repaint') route();
         return;
       }
       teardown = td;

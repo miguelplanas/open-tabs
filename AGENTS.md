@@ -184,7 +184,7 @@ trace.
 ## User preferences
 
 - No em-dashes in any prose or docs (use commas, colons, parentheses).
-- The owner is learning Claude Code workflows: explain what you are doing when
-  using plan mode, /goal, /code-review, /verify.
+- The owner is learning agent workflows: explain what you are doing when
+  planning, reviewing or verifying (plan mode, /code-review and similar).
 - The owner reviews PRs from an iPhone. Keep PR titles descriptive and diffs
   small enough to scan: a nine-file diff for a one-line request is a red flag.

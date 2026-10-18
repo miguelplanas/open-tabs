@@ -89,7 +89,7 @@ trace.
 
 ## Architecture
 
-- Node + Hono + better-sqlite3, no build step anywhere. The Node version in
+- Node 24 + Hono + `node:sqlite` (the SQLite built into Node, no native deps), no build step anywhere. Same stack as `plantilla-app`. The Node version in
   the Dockerfile is authoritative; CI and local nvm must match it.
 - `server/` is the JSON API (`/api/...`), `public/` is a vanilla-JS SPA (hash
   routing) served statically. One exception: `/sw.js` has its own route, which

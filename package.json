@@ -13,11 +13,10 @@
   "license": "MIT",
   "type": "module",
   "engines": {
-    "node": ">=20"
+    "node": ">=24"
   },
   "dependencies": {
     "@hono/node-server": "^2.0.8",
-    "better-sqlite3": "^12.11.1",
     "hono": "^4.12.27"
   }
 }

@@ -14,7 +14,7 @@
 // Destination defaults to $OPENTABS_BACKUP_DIR, then <db dir>/backups.
 // Retention: the newest KEEP files are kept, older ones are deleted.
 
-import Database from 'better-sqlite3';
+import { DatabaseSync } from 'node:sqlite';
 import { existsSync, mkdirSync, readdirSync, statSync, unlinkSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { db, ROOT } from '../server/db.js';
@@ -39,8 +39,8 @@ for (let n = 2; existsSync(target); n++) target = join(DIR, `opentabs-${stamp}-$
 db.exec(`VACUUM INTO '${target.replaceAll("'", "''")}'`);
 
 // Read the copy back before trusting it.
-const copy = new Database(target, { readonly: true });
-const integrity = copy.pragma('integrity_check', { simple: true });
+const copy = new DatabaseSync(target, { readOnly: true });
+const integrity = copy.prepare('PRAGMA integrity_check').get().integrity_check;
 const songs = copy.prepare('SELECT COUNT(*) AS n FROM songs').get().n;
 const collections = copy.prepare('SELECT COUNT(*) AS n FROM collections').get().n;
 copy.close();

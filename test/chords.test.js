@@ -6,7 +6,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   isChordToken, isChordLine, isTabLine, parseChord, transposeChord, renderBody,
-  fitChars, detectKind,
+  fitChars, detectKind, pageStep, pageKeyDirection,
 } from '../public/js/chords.js';
 
 test('isChordToken accepts real chords', () => {
@@ -193,4 +193,28 @@ test('renderBody without reflow is unchanged', () => {
 test('fitChars is zero for a body with nothing to fit', () => {
   assert.equal(fitChars(''), 0);
   assert.equal(fitChars('\n\n  \n'), 0);
+});
+
+test('pageStep scrolls the usable viewport minus two lines of overlap', () => {
+  // iPhone-ish: 844 tall, 60 top bar, 70 dock, 20px lines.
+  assert.equal(pageStep(844, 60, 70, 20), 844 - 60 - 70 - 40);
+  // Rounded to whole pixels.
+  assert.equal(pageStep(800, 50.4, 60, 20.3), Math.round(800 - 50.4 - 60 - 40.6));
+  // A tiny viewport (landscape, huge font) still moves at least one line.
+  assert.equal(pageStep(120, 60, 70, 24), 24);
+});
+
+test('pageKeyDirection maps page keys and ignores modifiers and Space', () => {
+  for (const key of ['PageDown', 'ArrowDown', 'ArrowRight', 'Enter']) {
+    assert.equal(pageKeyDirection({ key }), 1, key);
+  }
+  for (const key of ['PageUp', 'ArrowUp', 'ArrowLeft']) {
+    assert.equal(pageKeyDirection({ key }), -1, key);
+  }
+  for (const key of [' ', 'a', 'Escape', 'Home', 'Tab']) {
+    assert.equal(pageKeyDirection({ key }), 0, key);
+  }
+  for (const mod of ['ctrlKey', 'metaKey', 'altKey', 'shiftKey']) {
+    assert.equal(pageKeyDirection({ key: 'PageDown', [mod]: true }), 0, mod);
+  }
 });

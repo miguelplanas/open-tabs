@@ -242,3 +242,26 @@ export function fitChars(body, percentile = 0.95) {
   if (widths.length === 0) return 0;
   return widths[Math.min(widths.length - 1, Math.floor(widths.length * percentile))];
 }
+
+// Page turning in the reader (keyboard and Bluetooth page-turner pedals).
+// Kept here, with no DOM access, so the tests can import it.
+
+// Direction a key turns the page: 1 forward, -1 back, 0 not a page key.
+// Space is not here: it keeps toggling autoscroll. Modifier combos are left
+// to the browser and the OS (Cmd+Arrow, Alt+Arrow and friends).
+const PAGE_FORWARD = new Set(['PageDown', 'ArrowDown', 'ArrowRight', 'Enter']);
+const PAGE_BACK = new Set(['PageUp', 'ArrowUp', 'ArrowLeft']);
+export function pageKeyDirection(e) {
+  if (e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return 0;
+  if (PAGE_FORWARD.has(e.key)) return 1;
+  if (PAGE_BACK.has(e.key)) return -1;
+  return 0;
+}
+
+// Pixels one page turn scrolls: the part of the viewport the song is actually
+// visible in (minus the sticky top bar and the dock over the bottom), less two
+// lines that stay on screen so the eye keeps its place. Never less than a line.
+export function pageStep(viewportH, topbarH, dockH, lineH) {
+  const usable = viewportH - topbarH - dockH;
+  return Math.max(lineH, Math.round(usable - 2 * lineH));
+}

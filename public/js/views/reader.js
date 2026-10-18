@@ -1,5 +1,5 @@
 import { $app, api, escapeHtml, h } from '../app.js';
-import { renderBody, fitChars } from '../chords.js';
+import { renderBody, fitChars, pageStep, pageKeyDirection } from '../chords.js';
 import {
   addToCollectionDialog, openSheet, versionPickerDialog,
   groupKey, kindLabel, tuningLabel,
@@ -250,8 +250,10 @@ export async function readerView([id]) {
     .catch(() => { /* the selector simply stays hidden */ });
 
   document.getElementById('back').onclick = () => (location.hash = backHash);
+  const goTo = (i) => {
+    if (inSetlist && i >= 0 && i < setlist.ids.length) location.hash = '#/song/' + setlist.ids[i];
+  };
   if (inSetlist) {
-    const goTo = (i) => { if (i >= 0 && i < setlist.ids.length) location.hash = '#/song/' + setlist.ids[i]; };
     document.getElementById('prev').onclick = () => goTo(setIdx - 1);
     document.getElementById('next').onclick = () => goTo(setIdx + 1);
     if ($next) $next.onclick = () => goTo(setIdx + 1);
@@ -442,13 +444,44 @@ export async function readerView([id]) {
     tapT = e.timeStamp; tapX = e.clientX; tapY = e.clientY;
   });
 
+  // One page turn (keyboard or Bluetooth pedal). At the ends of the song, in a
+  // setlist, it moves to the next or previous song; outside one it does nothing.
+  // While autoscroll runs it keeps running from the new position: the turn is
+  // a correction ("I'm further on"), not a request to stop. The jump is then
+  // instant, because a smooth scroll would fight the autoscroll's own scrollBy.
+  function turnPage(dir) {
+    const y = window.scrollY;
+    if (dir > 0 && y >= endLimit - 1) return goTo(setIdx + 1);
+    if (dir < 0 && y <= 1) return goTo(setIdx - 1);
+    const topbarH = document.querySelector('.topbar')?.getBoundingClientRect().height || 0;
+    const dockH = $dock.getBoundingClientRect().height + 24; // dock plus its gap
+    const lineH = parseFloat(getComputedStyle($body).lineHeight) || 20;
+    const px = pageStep(window.innerHeight, topbarH, dockH, lineH);
+    const top = dir > 0 ? Math.min(y + px, endLimit) : Math.max(0, y - px);
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    window.scrollTo({ top, behavior: playing || reduce ? 'auto' : 'smooth' });
+    acc = 0;
+    keepAwake();
+  }
+
   // Space toggles autoscroll (handy on the laptop); ignore it while typing.
+  // Page keys turn the page, except while typing, with a sheet or dialog open,
+  // or with a modifier held.
   function onKey(e) {
-    if (e.key !== ' ' && e.code !== 'Space') return;
     const t = e.target;
     if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+    if (e.key === ' ' || e.code === 'Space') {
+      e.preventDefault();
+      toggle();
+      return;
+    }
+    const dir = pageKeyDirection(e);
+    if (!dir || t?.tagName === 'SELECT' || document.querySelector('[aria-modal="true"]')) return;
+    // Enter on a focused button or link still presses it (keyboard users).
+    // iOS does not focus buttons on tap, so a pedal's Enter is not swallowed.
+    if (e.key === 'Enter' && t?.closest?.('button, a')) return;
     e.preventDefault();
-    toggle();
+    turnPage(dir);
   }
   document.addEventListener('keydown', onKey);
 

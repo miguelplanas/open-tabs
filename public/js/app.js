@@ -7,6 +7,7 @@ import { collectionsView } from './views/collections.js';
 import { collectionView } from './views/collection.js';
 import { loginView } from './views/login.js';
 import { createNav } from './nav.js';
+import { planWarm, nextManifest } from './offline.js';
 
 export const $app = document.getElementById('app');
 
@@ -118,15 +119,20 @@ if ('serviceWorker' in navigator) {
 
 // Offline cache warmer: the service worker only caches songs and collections
 // as they are fetched, so a song imported but never opened would be missing
-// offline. Fetch everything once per app load (deferred, best-effort) so the
-// whole library is readable with no signal.
+// offline. Once per app load (deferred, best-effort) fetch what the cache is
+// missing or holds an older version of, and drop deleted ones, so the whole
+// library is readable with no signal. planWarm() in offline.js decides which.
 export function warmSong(id) {
   fetch(`/api/songs/${id}`).catch(() => {});
 }
 
+// Must match API_CACHE in sw.js.
+const API_CACHE = 'opentabs-api-v3';
+const WARM_KEY = 'opentabs.warmed';
+
 let warmed = false;
 async function warmOfflineCache() {
-  if (warmed || !navigator.onLine || !('serviceWorker' in navigator)) return;
+  if (warmed || !navigator.onLine || !('serviceWorker' in navigator) || !window.caches) return;
   warmed = true;
   try {
     const [songRes, colRes] = await Promise.all([
@@ -134,15 +140,32 @@ async function warmOfflineCache() {
       fetch('/api/collections'),
     ]);
     if (!songRes.ok || !colRes.ok) throw new Error('warm skipped');
-    const urls = [
-      ...(await songRes.json()).map((s) => `/api/songs/${s.id}`),
-      ...(await colRes.json()).map((c) => `/api/collections/${c.id}`),
+    const items = [
+      ...(await songRes.json()).map((s) => ({ url: `/api/songs/${s.id}`, version: s.updated_at })),
+      ...(await colRes.json()).map((c) => ({ url: `/api/collections/${c.id}`, version: c.updated_at })),
     ];
+    const cache = await caches.open(API_CACHE);
+    const cached = new Set((await cache.keys()).map((r) => new URL(r.url).pathname));
+    let manifest = {};
+    try { manifest = JSON.parse(localStorage.getItem(WARM_KEY)) || {}; } catch { /* refetch all */ }
+    const { fetch: urls, drop } = planWarm({ items, cached, manifest });
+    await Promise.all(drop.map((url) => cache.delete(url)));
+    // Only a response carrying the listed version counts: on a slow network
+    // the service worker answers with the stale cached copy after 3.5 s.
+    const want = new Map(items.map((it) => [it.url, it.version]));
+    const fetched = new Set();
     let i = 0;
     const worker = async () => {
-      while (i < urls.length) await fetch(urls[i++]).catch(() => {});
+      while (i < urls.length) {
+        const url = urls[i++];
+        const body = await fetch(url).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+        if (body?.updated_at === want.get(url)) fetched.add(url);
+      }
     };
     await Promise.all([worker(), worker(), worker()]);
+    try {
+      localStorage.setItem(WARM_KEY, JSON.stringify(nextManifest({ items, cached, manifest, fetched })));
+    } catch { /* next start refetches */ }
   } catch {
     warmed = false; // retry on the next load
   }

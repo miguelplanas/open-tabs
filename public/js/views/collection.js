@@ -235,7 +235,7 @@ export async function collectionView([id]) {
         const member = inCol.has(s.id);
         const row = h(`
           <li class="picker-row${member ? ' member' : ''}">
-            <span class="picker-name">${escapeHtml(s.title)}<span class="count"> · ${escapeHtml(s.artist || 'Unknown')}</span></span>
+            <span class="picker-name">${escapeHtml(s.title)}<span class="count">, ${escapeHtml(s.artist || 'Unknown')}</span></span>
             <span class="picker-check">${icon(member ? 'check' : 'plus')}</span>
           </li>`);
         row.onclick = async () => {

@@ -1,6 +1,7 @@
 import { serve } from '@hono/node-server';
 import { serveStatic } from '@hono/node-server/serve-static';
 import { Hono } from 'hono';
+import { compress } from 'hono/compress';
 import { createHash } from 'node:crypto';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
@@ -11,6 +12,13 @@ import { collections } from './collections.js';
 import { sources } from './sources/index.js';
 
 const app = new Hono();
+
+// gzip/deflate for everything compressible: /api/songs is about 112 KB of JSON
+// and 14 KB gzipped, which is most of a library load on a phone. Range
+// requests are left alone: serveStatic answers them with a 206 slice, and
+// compressing a slice would break its Content-Range.
+const gzip = compress();
+app.use('*', (c, next) => (c.req.header('Range') ? next() : gzip(c, next)));
 
 // Liveness probe for the homelab. Deliberately reads the database: a process
 // that is up but whose SQLite file is missing or unreadable is not healthy,

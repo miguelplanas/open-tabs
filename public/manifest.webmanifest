@@ -4,8 +4,8 @@
   "description": "Your own tab and chords library with autoscroll",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#f6f1e7",
-  "theme_color": "#f6f1e7",
+  "background_color": "#f8fbf9",
+  "theme_color": "#f8fbf9",
   "icons": [
     { "src": "/icons/icon-192.png?v=2", "sizes": "192x192", "type": "image/png" },
     { "src": "/icons/icon-512.png?v=2", "sizes": "512x512", "type": "image/png" },

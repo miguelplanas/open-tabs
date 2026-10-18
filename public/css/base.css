@@ -1,0 +1,184 @@
+/* Base común de las apps del homelab. Las reglas están en DESIGN.md.
+   Una app no edita este fichero: lo personaliza en su propio CSS cambiando
+   --hue (su color) y, si acaso, --font-display. Así todas comparten esqueleto
+   y cada una conserva su carácter. Para cambiar la base de todas, se cambia
+   en miguelplanas/plantilla-app y se copia a cada app en un PR. */
+
+:root {
+  color-scheme: light dark;
+
+  /* El único mando de color de cada app: el tono (0-360) de su acento. */
+  --hue: 250;
+
+  /* Neutros con una pizca del tono de la app, para que el gris no sea de nadie. */
+  --bg: oklch(98.5% 0.004 var(--hue));
+  --surface: oklch(100% 0 0);
+  --sunken: oklch(95.5% 0.006 var(--hue));
+  --ink: oklch(22% 0.012 var(--hue));
+  --ink-2: oklch(45% 0.012 var(--hue));
+  --ink-3: oklch(52% 0.01 var(--hue));
+  --line: oklch(22% 0.02 var(--hue) / 0.12);
+  --accent: oklch(50% 0.14 var(--hue));
+  --accent-ink: oklch(99% 0.01 var(--hue));
+  --accent-wash: oklch(50% 0.14 var(--hue) / 0.1);
+  --danger: oklch(52% 0.18 27);
+  --ok: oklch(52% 0.12 150);
+  --scrim: oklch(20% 0.01 var(--hue) / 0.4);
+
+  /* Tipografía del sistema: cero descargas, y en el iPhone es San Francisco. */
+  --font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-display: var(--font);
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+
+  /* Escala 1.2 (tercera menor): pocos tamaños, bien separados. */
+  --text-sm: 0.833rem;
+  --text-md: 1rem;
+  --text-lg: 1.2rem;
+  --text-xl: 1.44rem;
+  --text-2xl: 2.074rem;
+
+  /* Espaciado en múltiplos de 4px. */
+  --s1: 0.25rem; --s2: 0.5rem; --s3: 0.75rem; --s4: 1rem;
+  --s6: 1.5rem; --s8: 2rem; --s12: 3rem;
+
+  /* Dos radios: controles pequeños y superficies grandes. Nada más. */
+  --r-control: 8px;
+  --r-surface: 14px;
+
+  --measure: 40rem;
+  --tap: 44px;
+  --ease: cubic-bezier(0.2, 0, 0, 1);
+  --fast: 140ms;
+  --shadow: 0 1px 2px oklch(20% 0.02 var(--hue) / 0.06), 0 8px 24px -12px oklch(20% 0.02 var(--hue) / 0.18);
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: oklch(17% 0.008 var(--hue));
+    --surface: oklch(21% 0.01 var(--hue));
+    --sunken: oklch(14.5% 0.008 var(--hue));
+    --ink: oklch(93% 0.008 var(--hue));
+    --ink-2: oklch(72% 0.01 var(--hue));
+    --ink-3: oklch(66% 0.01 var(--hue));
+    --line: oklch(93% 0.02 var(--hue) / 0.11);
+    --accent: oklch(76% 0.12 var(--hue));
+    --accent-ink: oklch(18% 0.03 var(--hue));
+    --accent-wash: oklch(76% 0.12 var(--hue) / 0.14);
+    --danger: oklch(72% 0.15 27);
+    --ok: oklch(74% 0.12 150);
+    --scrim: oklch(0% 0 0 / 0.55);
+    --shadow: 0 1px 0 oklch(100% 0 0 / 0.04) inset, 0 8px 24px -12px oklch(0% 0 0 / 0.6);
+  }
+}
+
+/* --- Reset mínimo --- */
+*, *::before, *::after { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+body {
+  margin: 0;
+  min-height: 100dvh;
+  background: var(--bg);
+  color: var(--ink);
+  font: var(--text-md)/1.5 var(--font);
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+}
+h1, h2, h3, p, ul, ol, figure { margin: 0; }
+h1, h2, h3 { font-family: var(--font-display); line-height: 1.2; text-wrap: balance; }
+h1 { font-size: var(--text-2xl); font-weight: 650; letter-spacing: -0.02em; }
+h2 { font-size: var(--text-lg); font-weight: 600; }
+h3 { font-size: var(--text-md); font-weight: 600; }
+p { text-wrap: pretty; }
+a { color: var(--accent); text-underline-offset: 0.2em; }
+img, svg { display: block; max-width: 100%; }
+button, input, select, textarea { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+::selection { background: var(--accent-wash); }
+.num { font-variant-numeric: tabular-nums; }
+.muted { color: var(--ink-2); }
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+/* --- Estructura de página: una columna legible, cómoda en el iPhone --- */
+.page {
+  max-width: var(--measure);
+  margin-inline: auto;
+  padding: calc(var(--s6) + var(--safe-top)) var(--s4) calc(var(--s12) + var(--safe-bottom));
+  display: grid;
+  gap: var(--s8);
+}
+.page > header { display: flex; align-items: baseline; justify-content: space-between; gap: var(--s4); }
+.stack { display: grid; gap: var(--s3); }
+
+/* --- Controles --- */
+.btn {
+  min-height: var(--tap);
+  padding: 0 var(--s4);
+  border: 1px solid var(--line);
+  border-radius: var(--r-control);
+  background: var(--surface);
+  font-weight: 550;
+  cursor: pointer;
+  transition: background-color var(--fast) var(--ease), transform var(--fast) var(--ease);
+}
+.btn:hover { background: var(--sunken); }
+.btn:active { transform: scale(0.98); }
+.btn.primary { background: var(--accent); border-color: transparent; color: var(--accent-ink); }
+.btn.primary:hover { background: oklch(from var(--accent) calc(l - 0.05) c h); }
+.btn.quiet { border-color: transparent; background: transparent; color: var(--ink-2); }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.field {
+  min-height: var(--tap);
+  width: 100%;
+  padding: 0 var(--s3);
+  border: 1px solid var(--line);
+  border-radius: var(--r-control);
+  background: var(--surface);
+  font-size: max(16px, 1rem); /* por debajo de 16px el iPhone hace zoom al enfocar */
+}
+.field:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+.field::placeholder { color: var(--ink-3); }
+
+/* Una línea de entrada: campo que crece y botón a su lado. */
+.inline-form { display: flex; gap: var(--s2); }
+.inline-form .field { flex: 1; }
+
+/* --- Listas: la forma por defecto de mostrar cosas (no tarjetas) --- */
+.list {
+  list-style: none;
+  padding: 0;
+  border-block: 1px solid var(--line);
+}
+.list > li {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  min-height: var(--tap);
+  padding: var(--s3) 0;
+}
+.list > li + li { border-top: 1px solid var(--line); }
+.list .meta { margin-left: auto; color: var(--ink-3); font-size: var(--text-sm); font-variant-numeric: tabular-nums; }
+
+/* Superficie elevada: solo para lo que de verdad flota (hojas, diálogos). */
+.sheet {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-surface);
+  box-shadow: var(--shadow);
+  padding: var(--s6);
+}
+dialog.sheet { max-width: min(28rem, calc(100vw - 2 * var(--s4))); color: inherit; }
+dialog::backdrop { background: var(--scrim); }
+
+/* Vacío: una frase que diga qué hacer, sin ilustraciones de relleno. */
+.empty { padding: var(--s8) 0; color: var(--ink-2); }
+
+/* Mensaje de estado tras una acción (role="status" en el HTML). */
+.status { font-size: var(--text-sm); color: var(--ink-2); min-height: 1.5em; }
+.status.error { color: var(--danger); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
+}

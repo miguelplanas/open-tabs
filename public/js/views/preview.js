@@ -1,4 +1,5 @@
 import { $app, api, escapeHtml, warmSong } from '../app.js';
+import { icon } from '../icons.js';
 import { renderBody } from '../chords.js';
 import { toast } from '../ui.js';
 import { enableChordPopovers, hideChordPopover } from '../chord-shapes.js';
@@ -18,7 +19,7 @@ export async function previewView() {
 
   $app.innerHTML = `
     <header class="topbar">
-      <button class="btn icon" id="back" title="Back to search">←</button>
+      <button class="btn icon" id="back" title="Back to search" aria-label="Back to search">${icon('chevron-left')}</button>
       <h1>${escapeHtml(draft.title || 'Untitled')}
         <span class="sub">${escapeHtml(draft.artist || '')}${
           draft.capo ? ` · capo ${draft.capo}` : ''}${

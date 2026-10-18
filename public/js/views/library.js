@@ -1,4 +1,5 @@
 import { $app, api, h, escapeHtml, debounce } from '../app.js';
+import { icon } from '../icons.js';
 import {
   segmentNav, groupVersions, versionPickerDialog, onLongPress, songActionsSheet,
 } from '../ui.js';
@@ -18,8 +19,8 @@ export async function libraryView() {
     <header class="topbar">
       <div class="topbar-row">
         <h1>OpenTabs <span class="count" id="count"></span></h1>
-        <button class="btn icon" id="go-search" title="Search online">🌐</button>
-        <button class="btn primary" id="go-new">+ New</button>
+        <button class="btn icon" id="go-search" title="Search online" aria-label="Search online">${icon('globe')}</button>
+        <button class="btn primary" id="go-new">${icon('plus')} New</button>
       </div>
       <div id="seg"></div>
     </header>

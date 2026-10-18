@@ -1,4 +1,5 @@
 import { $app, api, escapeHtml, warmSong } from '../app.js';
+import { icon } from '../icons.js';
 import { renderBody } from '../chords.js';
 import { toast, confirmDialog } from '../ui.js';
 
@@ -24,7 +25,7 @@ export async function editorView([id]) {
 
   $app.innerHTML = `
     <header class="topbar">
-      <button class="btn icon" id="back" title="Back">←</button>
+      <button class="btn icon" id="back" title="Back" aria-label="Back">${icon('chevron-left')}</button>
       <h1>${id ? 'Edit song' : 'New song'}</h1>
       <button class="btn" id="preview-toggle">Preview</button>
       <button class="btn primary" id="save">Save</button>

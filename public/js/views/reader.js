@@ -1,4 +1,5 @@
 import { $app, api, escapeHtml, h } from '../app.js';
+import { icon } from '../icons.js';
 import { renderBody, fitChars, pageStep, pageKeyDirection } from '../chords.js';
 import {
   addToCollectionDialog, openSheet, versionPickerDialog,
@@ -79,17 +80,17 @@ export async function readerView([id]) {
 
   $app.innerHTML = `
     <header class="topbar">
-      <button class="btn icon" id="back" title="Back">←</button>
+      <button class="btn icon" id="back" title="Back" aria-label="Back">${icon('chevron-left')}</button>
       <h1>${escapeHtml(song.title)}
         <span class="sub" id="sub"></span>
       </h1>
-      <button class="btn icon" id="tools" title="Song tools" aria-haspopup="dialog">⋯</button>
+      <button class="btn icon" id="tools" title="Song tools" aria-label="Song tools" aria-haspopup="dialog">${icon('ellipsis')}</button>
     </header>
     ${inSetlist ? `
     <div class="setlist-bar">
-      <button class="btn icon" id="prev" title="Previous" ${setIdx === 0 ? 'disabled' : ''}>‹</button>
+      <button class="btn icon" id="prev" title="Previous" aria-label="Previous song" ${setIdx === 0 ? 'disabled' : ''}>${icon('chevron-left')}</button>
       <span class="setlist-info">${escapeHtml(setlist.name)} <span class="count">${setIdx + 1}/${setlist.ids.length}</span></span>
-      <button class="btn icon" id="next" title="Next" ${setIdx === setlist.ids.length - 1 ? 'disabled' : ''}>›</button>
+      <button class="btn icon" id="next" title="Next" aria-label="Next song" ${setIdx === setlist.ids.length - 1 ? 'disabled' : ''}>${icon('chevron-right')}</button>
     </div>` : ''}
     <div class="fret-rail" aria-hidden="true">
       <span class="fd" style="top:25%"></span>
@@ -103,15 +104,15 @@ export async function readerView([id]) {
     <div class="songend strings"></div>
     ${inSetlist && setIdx < setlist.ids.length - 1 ? `
     <button class="btn primary next-song" id="next-song" hidden>
-      Next: ${escapeHtml(setlist.titles?.[setIdx + 1] || 'next song')} ›
+      Next: ${escapeHtml(setlist.titles?.[setIdx + 1] || 'next song')} ${icon('chevron-right')}
     </button>` : ''}
     <div class="reader-dock" id="dock">
       <div class="dock-speed">
-        <button id="spd-down" aria-label="Scroll slower">−</button>
+        <button id="spd-down" aria-label="Scroll slower">${icon('minus')}</button>
         <span class="dock-level" id="lvl" title="Autoscroll speed" aria-live="polite"></span>
-        <button id="spd-up" aria-label="Scroll faster">+</button>
+        <button id="spd-up" aria-label="Scroll faster">${icon('plus')}</button>
       </div>
-      <button class="btn primary icon play" id="play" title="Autoscroll" aria-label="Start autoscroll">▶</button>
+      <button class="btn primary icon play" id="play" title="Autoscroll" aria-label="Start autoscroll">${icon('play', { cls: 'fill' })}</button>
     </div>`;
 
   const $body = document.getElementById('body');
@@ -291,7 +292,7 @@ export async function readerView([id]) {
         ${versions.length > 1 ? `
         <div class="tool-row">
           <span class="tool-label">Version</span>
-          <button class="btn" id="ver-btn">${escapeHtml(kindLabel(song.kind))} ▾</button>
+          <button class="btn" id="ver-btn">${escapeHtml(kindLabel(song.kind))} ${icon('chevron-down')}</button>
         </div>` : ''}
         <div class="tool-row">
           <span class="tool-label">Transpose</span>
@@ -411,7 +412,7 @@ export async function readerView([id]) {
 
   function toggle(on = !playing) {
     playing = on;
-    $play.textContent = playing ? '⏸' : '▶';
+    $play.innerHTML = icon(playing ? 'pause' : 'play', { cls: 'fill' });
     $play.classList.toggle('playing', playing);
     $play.setAttribute('aria-label', playing ? 'Pause autoscroll' : 'Start autoscroll');
     last = 0; acc = 0;

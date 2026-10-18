@@ -1,4 +1,5 @@
 import { $app, api, h, escapeHtml } from '../app.js';
+import { icon } from '../icons.js';
 import { promptDialog, segmentNav, toast } from '../ui.js';
 
 // Top-level list of collections (folders/albums/setlists).
@@ -7,7 +8,7 @@ export async function collectionsView() {
     <header class="topbar">
       <div class="topbar-row">
         <h1>OpenTabs</h1>
-        <button class="btn primary" id="new-col">+ New</button>
+        <button class="btn primary" id="new-col">${icon('plus')} New</button>
       </div>
       <div id="seg"></div>
     </header>

@@ -1,4 +1,5 @@
 import { $app, api, h, escapeHtml, debounce } from '../app.js';
+import { icon } from '../icons.js';
 import { toast } from '../ui.js';
 
 // Remembers the last online search for the session, so after importing one
@@ -8,7 +9,7 @@ const STATE_KEY = 'opentabs.searchState';
 export async function searchView() {
   $app.innerHTML = `
     <header class="topbar">
-      <button class="btn icon" id="back" title="Back">←</button>
+      <button class="btn icon" id="back" title="Back" aria-label="Back">${icon('chevron-left')}</button>
       <h1>Search online</h1>
       <select id="source" class="btn"></select>
     </header>
@@ -61,7 +62,7 @@ export async function searchView() {
 
   function ratingHtml(r) {
     if (!r.rating) return '';
-    return `<span class="rating">★ ${escapeHtml(r.rating)}</span> <span class="count">(${escapeHtml(r.votes ?? 0)})</span>`;
+    return `<span class="rating">${icon('star', { cls: 'fill', label: 'Rating' })} ${escapeHtml(r.rating)}</span> <span class="count">(${escapeHtml(r.votes ?? 0)})</span>`;
   }
 
   function renderResults() {

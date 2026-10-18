@@ -1,6 +1,7 @@
 import { $app, api, h, escapeHtml } from '../app.js';
 import { icon } from '../icons.js';
 import { promptDialog, confirmDialog, toast, onLongPress, songActionsSheet } from '../ui.js';
+import { visibleDescription } from '../collection-text.js';
 
 const SETLIST_KEY = 'opentabs.setlist';
 
@@ -22,7 +23,7 @@ export async function collectionView([id]) {
   $app.innerHTML = `
     <header class="topbar">
       <button class="btn icon" id="back" title="Back" aria-label="Back">${icon('chevron-left')}</button>
-      <h1 id="title"></h1>
+      <h1><span id="title"></span><span class="sub tnum" id="count"></span></h1>
       <button class="btn icon" id="rename" title="Rename" aria-label="Rename">${icon('pencil')}</button>
     </header>
     <main class="content">
@@ -41,14 +42,17 @@ export async function collectionView([id]) {
   const $list = document.getElementById('list');
   const $title = document.getElementById('title');
   const $desc = document.getElementById('desc');
+  const $count = document.getElementById('count');
   const $play = document.getElementById('play');
 
   document.getElementById('back').onclick = () => (location.hash = '#/collections');
 
   function renderHeader() {
     $title.textContent = col.name;
-    $desc.hidden = !col.description;
-    $desc.textContent = col.description || '';
+    const desc = visibleDescription(col.description);
+    $desc.hidden = !desc;
+    $desc.textContent = desc;
+    $count.textContent = `${col.songs.length} ${col.songs.length === 1 ? 'song' : 'songs'}`;
     $play.hidden = col.songs.length === 0;
   }
 

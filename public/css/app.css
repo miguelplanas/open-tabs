@@ -206,6 +206,14 @@ code { font-family: var(--mono); font-size: 0.9em; }
 
 /* Collections */
 .col-desc { color: var(--muted); font-size: 14px; margin: 0 0 12px; line-height: 1.5; }
+/* Row with its metadata pushed to the right edge (collection song counts). */
+.songlist li a.row-split { display: flex; align-items: center; gap: 12px; }
+.row-main { flex: 1; min-width: 0; }
+.row-end {
+  flex: none; color: var(--muted); font-family: var(--sans);
+  font-size: 13px; white-space: nowrap;
+}
+.row-end, .tnum { font-variant-numeric: tabular-nums; }
 .col-song { display: flex; align-items: stretch; gap: 8px; border-bottom: 1px solid var(--hair); }
 .songlist .col-song .col-song-main { flex: 1; min-width: 0; border-bottom: none; }
 .col-song.editing .col-song-main { pointer-events: none; }

@@ -8,19 +8,19 @@
   font-family: "Host Grotesk";
   src: url("/fonts/host-grotesk.woff2") format("woff2-variations");
   font-weight: 300 800;
-  font-display: swap;
+  font-display: block;
 }
 @font-face {
   font-family: "IBM Plex Mono";
   src: url("/fonts/plex-mono-400.woff2") format("woff2");
   font-weight: 400;
-  font-display: swap;
+  font-display: block;
 }
 @font-face {
   font-family: "IBM Plex Mono";
   src: url("/fonts/plex-mono-500.woff2") format("woff2");
   font-weight: 500;
-  font-display: swap;
+  font-display: block;
 }
 
 :root {
@@ -45,7 +45,7 @@
   --surface: #ffffff;
   --sunken: #eeeeea;
   --ink: #131313;
-  --ink-2: #5e5e5a;
+  --ink-2: #6b6b68;
   --line: rgb(19 19 19 / 0.12);
   --danger: #b3261e;
   --ok: #1e7a3c;
@@ -63,7 +63,7 @@
   --measure: 40rem;
   --tap: 44px;
   --ease: cubic-bezier(0.2, 0, 0, 1);
-  --fast: 140ms;
+  --fast: 160ms;
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
 }
@@ -76,7 +76,7 @@
     --surface: #1a1a18;
     --sunken: #0a0a09;
     --ink: #ebebe6;
-    --ink-2: #a3a39d;
+    --ink-2: #8e8e88;
     --line: rgb(235 235 230 / 0.12);
     --danger: #f2817a;
     --ok: #6fcf8f;
@@ -90,7 +90,7 @@
   --surface: #1a1a18;
   --sunken: #0a0a09;
   --ink: #ebebe6;
-  --ink-2: #a3a39d;
+  --ink-2: #8e8e88;
   --line: rgb(235 235 230 / 0.12);
   --danger: #f2817a;
   --ok: #6fcf8f;

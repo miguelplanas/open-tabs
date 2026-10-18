@@ -8,7 +8,7 @@ export async function collectionsView() {
   $app.innerHTML = `
     <header class="topbar">
       <div class="topbar-row">
-        <h1>OpenTabs</h1>
+        <h1 class="brand">OpenTabs</h1>
         <button class="btn primary" id="new-col">${icon('plus')} New</button>
       </div>
       <div id="seg"></div>

@@ -264,3 +264,18 @@ test('leaves range requests uncompressed so the slice stays valid', async () => 
   assert.equal(res.headers.get('content-encoding'), null);
   assert.equal((await res.text()).length, 10);
 });
+
+// The service worker precaches the shell; one missing file fails the whole
+// install and the app stops working offline. The fonts and theme.js came in
+// with the shared style, so they are the easiest ones to forget.
+test('every file the service worker precaches is served', async () => {
+  const sw = readFileSync(join(ROOT, 'public/sw.js'), 'utf8');
+  const list = sw.slice(sw.indexOf('const SHELL = ['), sw.indexOf('];', sw.indexOf('const SHELL = [')));
+  const paths = [...list.matchAll(/'(\/[^']*)'/g)].map((m) => m[1]);
+  assert.ok(paths.includes('/fonts/host-grotesk.woff2'));
+  assert.ok(paths.includes('/js/theme.js'));
+  for (const p of paths) {
+    const got = await fetch(`${base}${p}`);
+    assert.equal(got.status, 200, `${p} is not served`);
+  }
+});

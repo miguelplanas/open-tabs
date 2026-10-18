@@ -18,11 +18,14 @@ export async function libraryView() {
   $app.innerHTML = `
     <header class="topbar">
       <div class="topbar-row">
-        <h1>OpenTabs <span class="count" id="count"></span></h1>
+        <h1 class="brand">OpenTabs <span class="count" id="count"></span></h1>
         <button class="btn icon" id="go-search" title="Search online" aria-label="Search online">${icon('globe')}</button>
         <button class="btn primary" id="go-new">${icon('plus')} New</button>
       </div>
-      <div id="seg"></div>
+      <div class="topbar-row">
+        <div id="seg"></div>
+        <button class="btn quiet theme-toggle" type="button" data-theme-toggle aria-label="Cambiar tema claro u oscuro"></button>
+      </div>
     </header>
     <main class="content">
       <input class="searchbox" id="q" type="search" placeholder="Search your library…" autocomplete="off">
@@ -99,7 +102,7 @@ export async function libraryView() {
     if ($q.value.trim()) return;
     const n = groupVersions(all).length;
     document.getElementById('count').textContent =
-      n > 0 ? `· ${n} ${n === 1 ? 'song' : 'songs'}` : '';
+      n > 0 ? `[${n}]` : '';
   }
 
   // A version deleted from the action sheet is already gone on the server, so

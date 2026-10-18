@@ -22,8 +22,8 @@ export async function previewView() {
       <button class="btn icon" id="back" title="Back to search" aria-label="Back to search">${icon('chevron-left')}</button>
       <h1>${escapeHtml(draft.title || 'Untitled')}
         <span class="sub">${escapeHtml(draft.artist || '')}${
-          draft.capo ? ` · capo ${draft.capo}` : ''}${
-          draft.tuning && draft.tuning.toLowerCase() !== 'standard' ? ` · ${escapeHtml(draft.tuning)}` : ''}</span>
+          draft.capo ? `, capo ${draft.capo}` : ''}${
+          draft.tuning && draft.tuning.toLowerCase() !== 'standard' ? `, ${escapeHtml(draft.tuning)}` : ''}</span>
       </h1>
       <span class="badge">preview</span>
     </header>

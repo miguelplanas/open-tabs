@@ -207,7 +207,7 @@ export async function readerView([id]) {
     // Which version you are reading only matters when there is more than one.
     if (versions.length > 1) bits.push(kindLabel(song.kind));
     if (transpose) bits.push(`transpose ${transpose > 0 ? '+' : ''}${transpose}`);
-    $sub.textContent = bits.filter(Boolean).join(' · ');
+    $sub.textContent = bits.filter(Boolean).join(', ');
 
     $lvl.textContent = String(level);
     const set = (elId, text) => {
@@ -216,7 +216,7 @@ export async function readerView([id]) {
     };
     set('tr-val', transpose > 0 ? '+' + transpose : String(transpose));
     set('fs-val', String(fontSize));
-    set('sp-val', '· level ' + level);
+    set('sp-val', '(level ' + level + ')');
     const slider = document.getElementById('sheet-speed');
     if (slider && slider !== document.activeElement) slider.value = String(level);
   }

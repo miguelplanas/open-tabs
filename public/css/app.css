@@ -160,7 +160,57 @@ select.btn, select.btn:hover {
 .error { color: var(--danger); }
 .spinner { color: var(--ink-2); text-align: center; padding: var(--s8); }
 
-/* Selector Songs / Collections */
+/* Cabeceras de sección (A-Z y Artist): se quedan pegadas bajo la cabecera
+   fija mientras dura su sección. --stick lo mide library.js. */
+.songlist .section > ul { list-style: none; margin: 0; padding: 0; }
+.songlist .group-header {
+  position: sticky; top: var(--stick, 0px); z-index: 5;
+  background: var(--bg);
+}
+.songlist .section > .group-header { padding-top: var(--s4); }
+.songlist .section:first-child > .group-header { padding-top: var(--s1); }
+/* Con el índice A-Z, la lista deja sitio a la derecha para las letras. */
+.songlist.with-index { padding-right: 22px; }
+
+/* Índice A-Z en el borde derecho, como en Contactos de iOS: tocar o
+   arrastrar salta a la letra. Las letras sin canciones se atenúan pero se
+   quedan, para que cada letra conserve su sitio bajo el dedo. */
+.az-index {
+  position: fixed; z-index: 12;
+  top: calc(68px + var(--safe-top)); /* library.js lo ajusta a la cabecera */
+  bottom: calc(var(--tabbar-h, 0px) + var(--s3) + var(--safe-bottom));
+  right: max(var(--s1), calc((100vw - var(--measure)) / 2 - 36px));
+  width: 28px;
+  /* La columna ocupa todo el alto libre; las letras van centradas en ella y
+     solo ellas recogen el dedo, así no tapan el buscador de arriba. */
+  display: flex; flex-direction: column; justify-content: center;
+  pointer-events: none;
+}
+.az-index[hidden] { display: none; }
+.az-strip {
+  pointer-events: auto;
+  display: flex; flex-direction: column; align-items: center;
+  padding-block: 6px;
+  font: var(--tech-s); font-weight: 500; line-height: 16px;
+  color: var(--ink);
+  touch-action: none; user-select: none; -webkit-user-select: none;
+  cursor: pointer;
+}
+.az-index .off, .az-index .az-dot { color: var(--ink-2); opacity: 0.45; }
+/* La letra grande en el centro mientras se arrastra. */
+.az-bubble {
+  position: fixed; z-index: 40; left: 50%; top: 45%;
+  transform: translate(-50%, -50%);
+  min-width: 88px; height: 88px; padding: 0 var(--s4);
+  display: flex; align-items: center; justify-content: center;
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-surface);
+  box-shadow: var(--shadow);
+  font: var(--text-l); font-weight: 500; color: var(--ink);
+  pointer-events: none;
+}
+.az-bubble[hidden] { display: none; }
+
+/* Selector de orden de la biblioteca (Recent, A-Z, Artist) */
 .segments {
   display: flex; gap: var(--s1); padding: var(--s1);
   background: var(--sunken); border-radius: var(--r-control);

@@ -236,6 +236,30 @@ export function renderBody(body, semitones = 0, { reflow = false } = {}) {
   return out.join(reflow ? '' : '\n');
 }
 
+// The distinct chords of a song in the order they first appear, for the strip
+// of diagrams above the reader. Only chord lines count, exactly as the renderer
+// sees them, so a lyric word like "Am" in a sentence never sneaks in. Footnote
+// asterisks and wrapping parentheses ("(Am)", "G*") are dropped: they mark a
+// place in the song, not a different chord. Returned untransposed; the reader
+// transposes them with the rest of the song.
+export function uniqueChords(body) {
+  const seen = new Set();
+  const out = [];
+  for (const line of String(body || '').split('\n')) {
+    if (isTabLine(line) || !isChordLine(line)) continue;
+    for (const tok of line.trim().split(/\s+/)) {
+      if (!isChordToken(tok)) continue;
+      let c = tok.replace(/\*+$/, '');
+      if (c.startsWith('(')) c = c.slice(1);
+      const open = (c.match(/\(/g) || []).length;
+      const close = (c.match(/\)/g) || []).length;
+      if (close > open && c.endsWith(')')) c = c.slice(0, -1);
+      if (c && !seen.has(c)) { seen.add(c); out.push(c); }
+    }
+  }
+  return out;
+}
+
 // Width, in characters, that the reader should size its font to fit.
 //
 // The widest line is the wrong target: one malformed 200-char import (or a

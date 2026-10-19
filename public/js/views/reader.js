@@ -1,11 +1,15 @@
 import { $app, api, escapeHtml, h } from '../app.js';
 import { icon } from '../icons.js';
-import { renderBody, fitChars, pageStep, pageKeyDirection } from '../chords.js';
+import {
+  renderBody, fitChars, pageStep, pageKeyDirection, uniqueChords, transposeChord,
+} from '../chords.js';
 import {
   addToCollectionDialog, openSheet, versionPickerDialog,
   groupKey, kindLabel, tuningLabel,
 } from '../ui.js';
-import { enableChordPopovers, hideChordPopover } from '../chord-shapes.js';
+import {
+  enableChordPopovers, hideChordPopover, showChordPopover, chordShape, diagramSvg,
+} from '../chord-shapes.js';
 import { swapSetlistSong } from '../setlist.js';
 
 // Autoscroll speed is persisted per song in pixels/second, but the reader
@@ -101,6 +105,13 @@ export async function readerView([id]) {
       <span class="fd fd-oct" style="top:100%"></span>
       <span class="fret-here" id="progress"></span>
     </div>
+    <section class="song-head" id="head" aria-label="About this song">
+      <div class="song-facts">
+        <span class="tech" id="facts"></span>
+        <button type="button" class="btn quiet strip-toggle" id="strip-toggle" aria-controls="strip"></button>
+      </div>
+      <ul class="chord-strip" id="strip" aria-label="Chords in this song"></ul>
+    </section>
     <pre class="tabbody" id="body"></pre>
     <div class="songend strings"></div>
     ${inSetlist && setIdx < setlist.ids.length - 1 ? `
@@ -122,6 +133,46 @@ export async function readerView([id]) {
   const $lvl = document.getElementById('lvl');
   const $sub = document.getElementById('sub');
   const $progress = document.getElementById('progress');
+  const $head = document.getElementById('head');
+  const $strip = document.getElementById('strip');
+  const $stripToggle = document.getElementById('strip-toggle');
+
+  // Song header: capo and tuning, then every chord the song uses in the order
+  // it first plays them, as small diagrams to warm up on before starting. The
+  // diagrams can fold down to just the names; that choice is remembered.
+  const songChords = uniqueChords(bodyText);
+  const facts = [];
+  if (song.capo) facts.push(`[capo ${song.capo}]`);
+  if (tuningLabel(song.tuning)) facts.push(`[${tuningLabel(song.tuning)}]`);
+  document.getElementById('facts').textContent = facts.join(' ');
+  $head.hidden = facts.length === 0 && songChords.length === 0;
+  $strip.hidden = $stripToggle.hidden = songChords.length === 0;
+  let stripOpen = true;
+  try { stripOpen = localStorage.getItem('opentabs.chordStrip') !== 'names'; } catch { /* default */ }
+
+  function renderHead() {
+    if (!songChords.length) return;
+    $stripToggle.textContent = stripOpen ? 'Hide diagrams' : 'Show diagrams';
+    $stripToggle.setAttribute('aria-expanded', String(stripOpen));
+    $strip.innerHTML = songChords.map((c) => {
+      const name = transposeChord(c, transpose);
+      const frets = stripOpen ? chordShape(name) : null;
+      return `<li><button type="button" class="strip-chord" aria-label="${escapeHtml(name)}, show fingering">` +
+        `<span class="chord">${escapeHtml(name)}</span>${frets ? diagramSvg(frets) : ''}</button></li>`;
+    }).join('');
+  }
+  $stripToggle.onclick = () => {
+    stripOpen = !stripOpen;
+    try { localStorage.setItem('opentabs.chordStrip', stripOpen ? 'diagrams' : 'names'); } catch { /* not remembered */ }
+    renderHead();
+    computeEndLimit();
+    updateProgress();
+  };
+  // Tapping a chord in the strip opens the same, larger fingering popover.
+  $strip.addEventListener('click', (e) => {
+    const b = e.target.closest('.strip-chord');
+    if (b) showChordPopover(b.querySelector('.chord'));
+  });
 
   // In a setlist, surface "Next: …" once the reader hits the end of the song,
   // so advancing never requires scrolling back to the top bar.
@@ -194,6 +245,7 @@ export async function readerView([id]) {
 
   function render() {
     $body.innerHTML = renderBody(bodyText, transpose, { reflow: reflowing });
+    renderHead();
     syncMeta();
   }
 
@@ -201,10 +253,8 @@ export async function readerView([id]) {
   // The transpose amount lives in the subtitle now that it is off the dock: it
   // has to stay visible somewhere, or a song silently reads in the wrong key.
   function syncMeta() {
+    // Capo and tuning live in the song header above the body.
     const bits = [song.artist];
-    if (song.capo) bits.push(`capo ${song.capo}`);
-    const tuning = tuningLabel(song.tuning);
-    if (tuning) bits.push(tuning);
     // Which version you are reading only matters when there is more than one.
     if (versions.length > 1) bits.push(kindLabel(song.kind));
     if (transpose) bits.push(`transpose ${transpose > 0 ? '+' : ''}${transpose}`);

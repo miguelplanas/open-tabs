@@ -2,13 +2,14 @@ import { $app, api, h, escapeHtml, debounce } from '../app.js';
 import { icon } from '../icons.js';
 import { toast } from '../ui.js';
 import { addRecent, loadRecent, saveRecent, parseLink } from '../search-history.js';
+import { queryFromSearchParams } from '../search-route.js';
 
 // Remembers the last online search for the session, so after importing one
 // version the user can come back and grab another without retyping.
 const STATE_KEY = 'opentabs.searchState';
 const OFFLINE = 'You are offline. Online search needs a connection.';
 
-export async function searchView() {
+export async function searchView([params] = []) {
   $app.innerHTML = `
     <header class="topbar">
       <h1>Search online</h1>
@@ -262,15 +263,25 @@ export async function searchView() {
     if (e.key === 'Enter') { debouncedSearch.cancel(); search(); }
   });
 
-  // Restore the previous search of this session, if any.
-  try {
-    const prev = JSON.parse(sessionStorage.getItem(STATE_KEY));
-    if (prev?.q && sourcesList.some((s) => s.name === prev.source)) {
-      $source.value = prev.source;
-      $q.value = prev.q;
-      search();
-    }
-  } catch { /* start blank */ }
+  // A query handed over in the URL (the library's 'Search "x" online') runs
+  // straight away. The hash then drops it, so coming back from an import
+  // restores the session's last search below instead of this one.
+  const handed = queryFromSearchParams(params);
+  if (handed) {
+    history.replaceState(null, '', '#/search');
+    $q.value = handed;
+    search();
+  } else {
+    // Restore the previous search of this session, if any.
+    try {
+      const prev = JSON.parse(sessionStorage.getItem(STATE_KEY));
+      if (prev?.q && sourcesList.some((s) => s.name === prev.source)) {
+        $source.value = prev.source;
+        $q.value = prev.q;
+        search();
+      }
+    } catch { /* start blank */ }
+  }
   if (!$q.value) showStart();
   $q.focus();
 

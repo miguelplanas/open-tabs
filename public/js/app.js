@@ -2,6 +2,7 @@ import { libraryView } from './views/library.js';
 import { readerView } from './views/reader.js';
 import { editorView } from './views/editor.js';
 import { searchView } from './views/search.js';
+import { SEARCH_ROUTE } from './search-route.js';
 import { previewView } from './views/preview.js';
 import { collectionsView } from './views/collections.js';
 import { collectionView } from './views/collection.js';
@@ -54,7 +55,7 @@ const routes = [
   { re: /^#\/song\/(\d+)$/, view: readerView },
   { re: /^#\/edit\/(\d+)$/, view: editorView },
   { re: /^#\/new$/, view: editorView },
-  { re: /^#\/search$/, view: searchView },
+  { re: SEARCH_ROUTE, view: searchView },
   { re: /^#\/preview$/, view: previewView },
   { re: /^#\/collections$/, view: collectionsView },
   { re: /^#\/collection\/(\d+)$/, view: collectionView },

@@ -19,7 +19,7 @@ export async function libraryView() {
     <header class="topbar">
       <div class="topbar-row">
         <h1 class="brand">OpenTabs <span class="count" id="count"></span></h1>
-        <button class="btn quiet theme-toggle" type="button" data-theme-toggle aria-label="Cambiar tema claro u oscuro"></button>
+        <button class="btn quiet theme-toggle" type="button" data-theme-toggle aria-label="Switch light or dark theme"></button>
         <button class="btn primary" id="go-new">${icon('plus')} New</button>
       </div>
     </header>

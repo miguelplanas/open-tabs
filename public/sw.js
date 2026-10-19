@@ -17,7 +17,7 @@ const SHELL_CACHE = 'opentabs-shell-__SHELL_VERSION__';
 const API_CACHE = 'opentabs-api-v3'; // also named in app.js (offline warmer)
 const SHELL = [
   '/', '/index.html', '/css/base.css', '/css/app.css', '/manifest.webmanifest',
-  '/js/app.js', '/js/nav.js', '/js/chords.js', '/js/ui.js', '/js/chord-shapes.js',
+  '/js/app.js', '/js/nav.js', '/js/chords.js', '/js/ui.js', '/js/chord-shapes.js', '/js/autoscroll.js',
   '/js/icons.js', '/js/theme.js',
   '/fonts/host-grotesk.woff2', '/fonts/plex-mono-400.woff2', '/fonts/plex-mono-500.woff2', '/js/busy.js', '/js/offline.js', '/js/setlist.js', '/js/overlays.js',
   '/js/collection-text.js', '/js/search-history.js', '/js/search-route.js',

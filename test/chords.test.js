@@ -6,7 +6,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   isChordToken, isChordLine, isTabLine, parseChord, transposeChord, renderBody,
-  fitChars, detectKind, pageStep, pageKeyDirection,
+  fitChars, detectKind, pageStep, pageKeyDirection, uniqueChords,
 } from '../public/js/chords.js';
 
 test('isChordToken accepts real chords', () => {
@@ -241,4 +241,15 @@ test('pageKeyDirection maps page keys and ignores modifiers and Space', () => {
   for (const mod of ['ctrlKey', 'metaKey', 'altKey', 'shiftKey']) {
     assert.equal(pageKeyDirection({ key: 'PageDown', [mod]: true }), 0, mod);
   }
+});
+
+test('uniqueChords lists each chord once, in order of first appearance', () => {
+  const body = '[Intro]\nAm   G\n\nC        G    Am\nsome lyric line\nF*  (G)  A7(4)  (Am)\nAm is in this lyric, not a chord line';
+  assert.deepEqual(uniqueChords(body), ['Am', 'G', 'C', 'F', 'A7(4)']);
+});
+
+test('uniqueChords ignores staves and handles empty bodies', () => {
+  assert.deepEqual(uniqueChords('e|--0--2--|\nB|--1--3--|'), []);
+  assert.deepEqual(uniqueChords(''), []);
+  assert.deepEqual(uniqueChords(undefined), []);
 });

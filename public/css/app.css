@@ -323,7 +323,19 @@ select.btn, select.btn:hover {
 .tabbody .flow { display: block; white-space: pre-wrap; }
 
 .tabbody .chord { color: var(--chord); font-weight: 500; cursor: pointer; }
-.tabbody .section { font-weight: 500; color: var(--ink); }
+/* Secciones ([Intro], [Chorus]) como títulos pequeños sin corchetes: voz Text
+   (no Mono), gris y con una línea fina detrás, para que no se confundan con
+   un acorde ni con la letra. inline-flex y no block: en el modo sin recolocar
+   va dentro del <pre> y un bloque seguido del salto de línea dejaría una
+   línea en blanco de más. */
+.tabbody .section {
+  display: inline-flex; align-items: center; gap: 0.6em; width: 100%;
+  vertical-align: bottom;
+  font-family: var(--sans); font-weight: 500; color: var(--ink-2);
+  white-space: nowrap;
+}
+.tabbody .row.section { display: flex; }
+.tabbody .section::after { content: ''; flex: 1; height: 1px; background: var(--line); }
 .tabbody .tabline { color: var(--tabline); }
 
 /* Fin de canción: lo justo para que la última línea libre el dock. */

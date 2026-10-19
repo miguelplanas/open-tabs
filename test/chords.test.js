@@ -253,3 +253,15 @@ test('uniqueChords ignores staves and handles empty bodies', () => {
   assert.deepEqual(uniqueChords(''), []);
   assert.deepEqual(uniqueChords(undefined), []);
 });
+
+test('section markers render as headings without their brackets', () => {
+  for (const reflow of [false, true]) {
+    const out = renderBody('[Verse 1]\nC\nhello\n  [Chorus]  ', 0, { reflow });
+    assert.match(out, /role="heading" aria-level="2" title="\[Verse 1\]">Verse 1<\/span>/);
+    assert.match(out, /title="\[Chorus\]">Chorus<\/span>/);
+    // Not mistaken for a chord, and no bracket left in the visible text.
+    assert.doesNotMatch(out, />\[(Verse 1|Chorus)\]</);
+    assert.equal(out.match(/class="chord"/g).length, 1);
+  }
+  assert.match(renderBody('[<b>]'), /title="\[&lt;b&gt;\]">&lt;b&gt;</);
+});

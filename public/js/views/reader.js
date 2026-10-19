@@ -6,6 +6,7 @@ import {
   groupKey, kindLabel, tuningLabel,
 } from '../ui.js';
 import { enableChordPopovers, hideChordPopover } from '../chord-shapes.js';
+import { swapSetlistSong } from '../setlist.js';
 
 // Autoscroll speed is persisted per song in pixels/second, but the reader
 // exposes it as a 1..20 "level": the dock then has memorable steps and the
@@ -330,7 +331,16 @@ export async function readerView([id]) {
     if ($ver) {
       $ver.onclick = () => {
         sheet.close();
-        versionPickerDialog(versions, { currentId: song.id });
+        versionPickerDialog(versions, {
+          currentId: song.id,
+          // Keep playing through the setlist with the version you picked.
+          onPick: (v) => {
+            if (!inSetlist) return;
+            try {
+              sessionStorage.setItem('opentabs.setlist', JSON.stringify(swapSetlistSong(setlist, song.id, v.id)));
+            } catch { /* the setlist is lost, as before */ }
+          },
+        });
       };
     }
     el.querySelector('#tr-down').onclick = () => setTranspose(transpose - 1);

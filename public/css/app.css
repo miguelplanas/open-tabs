@@ -381,6 +381,9 @@ label.f > * { margin-top: var(--s1); color: var(--ink); }
 /* --- Buscar online --- */
 .result-actions { display: flex; gap: var(--s2); margin-top: var(--s2); }
 .rating { color: var(--accent); }
+/* Inicio con la caja vacía: una línea de ayuda, Pegar enlace y recientes. */
+.search-hint { color: var(--ink-2); margin: var(--s2) 0 var(--s3); }
+.search-recent-head { display: flex; align-items: center; justify-content: space-between; margin-top: var(--s6); }
 
 /* Resultado agrupado: la fila es la canción; al abrirla salen sus versiones
    como subfilas sangradas. */

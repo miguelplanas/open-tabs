@@ -73,7 +73,8 @@ export function versionLabel(song) {
 // Choose which version of a song to open. Shared by the library (tapping a
 // song that has more than one) and the reader (switching without going back).
 // Needs only list columns, so it never loads a tab body.
-export function versionPickerDialog(versions, { currentId = null } = {}) {
+// onPick(version) runs before navigating to another version.
+export function versionPickerDialog(versions, { currentId = null, onPick = null } = {}) {
   const top = versions[0];
   const overlay = h(`
     <div class="confirm-overlay">
@@ -111,7 +112,9 @@ export function versionPickerDialog(versions, { currentId = null } = {}) {
       </li>`);
     row.onclick = () => {
       close();
-      if (!current) location.hash = '#/song/' + v.id;
+      if (current) return;
+      onPick?.(v);
+      location.hash = '#/song/' + v.id;
     };
     list.append(row);
   }

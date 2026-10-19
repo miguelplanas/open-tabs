@@ -7,6 +7,7 @@ import { collectionsView } from './views/collections.js';
 import { collectionView } from './views/collection.js';
 import { loginView } from './views/login.js';
 import { createNav } from './nav.js';
+import { closeAllOverlays } from './ui.js';
 import { planWarm, nextManifest } from './offline.js';
 
 export const $app = document.getElementById('app');
@@ -84,6 +85,9 @@ function restoreScroll(hash, seq) {
 
 async function route() {
   const my = nav.begin();
+  // Sheets and dialogs belong to the view being left: never let one cover
+  // the next view or act on a view that is gone.
+  closeAllOverlays();
   if (lastHash && KEEPS_SCROLL.test(lastHash)) scrollMemo.set(lastHash, window.scrollY);
   if (typeof teardown === 'function') teardown();
   teardown = null;

@@ -99,42 +99,18 @@ OPENTABS_PASSWORD=mysecret docker compose up --build
 Songs are stored in `./data/opentabs.db`. Back that file up and you've backed
 up everything. To migrate hosts, copy the file and start the container there.
 
-## Self-host it (Proxmox LXC)
+## Deploy
 
-Run it as a plain Node process under systemd in a Debian LXC. Docker inside an
-unprivileged container needs nesting plus keyctl and a degraded storage driver,
-which buys nothing here: the app is one process and one file.
+Merging to `main` deploys: CI runs the tests, then a shared workflow tells
+Dokploy (Docker Swarm on the `prod` VM) to build and start the new image. See
+`AGENTS.md` for the whole path. Data lives in a Docker volume.
 
-```bash
-# In the container (2 vCPU / 1 GB RAM is generous)
-apt install -y nodejs npm curl          # curl is required by the tab sources
-adduser --system --group opentabs
-install -d -o opentabs -g opentabs /var/lib/opentabs
-git clone <repo> /opt/opentabs && cd /opt/opentabs && npm ci --omit=dev
-
-cp deploy/opentabs.service deploy/opentabs-backup.{service,timer} /etc/systemd/system/
-printf 'OPENTABS_PASSWORD=%s\n' "$(openssl rand -base64 24)" > /etc/opentabs.env
-chmod 600 /etc/opentabs.env
-systemctl enable --now opentabs opentabs-backup.timer
-```
-
-Bring an existing library across with a verified copy rather than `cp`:
-
-```bash
-node scripts/backup-db.js                      # on the old host
-scp data/backups/opentabs-*.db root@lxc:/var/lib/opentabs/opentabs.db
-chown opentabs:opentabs /var/lib/opentabs/opentabs.db
-```
-
-`GET /healthz` answers `{"ok":true,"songs":N}` and touches the database, so it
+`GET /health` answers `{"ok":true,"songs":N}` and touches the database, so it
 fails when the file is missing or unreadable rather than only when the process
-dies. Point Uptime Kuma or `systemd` at it.
+dies. It is what the uptime monitor checks.
 
-For TLS, put Caddy in front of it or, simpler for a personal library, run
-Tailscale in the container and `tailscale serve --bg --https=443 localhost:3000`.
-That gives a real certificate with no port forwarding and no public exposure,
-and HTTPS is required anyway: the screen wake lock and the service worker only
-exist in a secure context.
+HTTPS is required: the screen wake lock and the service worker only exist in a
+secure context.
 
 ### Backups
 
@@ -142,11 +118,8 @@ exist in a secure context.
 back to check it (`integrity_check` plus a row count against the live
 database), keeping the newest 14. It uses `VACUUM INTO`, so it is safe while
 the app is running, unlike `cp` on a WAL database, and the output file is
-restored by renaming it over `opentabs.db`.
-
-The timer keeps copies on the same disk, which only covers mistakes, not a dead
-disk. Add one line to push them elsewhere (`restic`, `rsync`, or a Proxmox
-Backup Server job on the container) and the library is genuinely safe.
+restored by renaming it over `opentabs.db`. Run it before anything risky to
+the data. The daily safety net is the Proxmox copy of the whole `prod` VM.
 
 ## Use it on iPhone
 

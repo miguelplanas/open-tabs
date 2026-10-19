@@ -467,6 +467,36 @@ label.f > * { margin-top: var(--s1); color: var(--ink); }
 }
 .toast.show { opacity: 1; transform: translateY(0); }
 .toast.danger { border-color: oklch(from var(--danger) l c h / 0.4); color: var(--danger); }
+/* Con la barra inferior a la vista, los avisos salen por encima de ella. */
+body.has-tabbar .toast-stack { bottom: calc(var(--tabbar-h) + var(--s3) + var(--safe-bottom)); }
+
+/* --- Barra inferior: Songs, Collections, Search ---
+   Fija y fuera de #app (la pinta app.js una vez). Se esconde en el lector, el
+   editor, la vista previa y el login (tabs.js), así nunca tapa el dock ni la
+   barra de acción. Navegación principal, así que va en la voz Brand; la
+   pestaña activa se marca con tinta y trazo más grueso, sin color. */
+:root { --tabbar-h: 56px; }
+body.has-tabbar { padding-bottom: calc(var(--tabbar-h) + var(--safe-bottom)); }
+.tabbar {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 30;
+  display: flex; justify-content: center;
+  padding: 0 var(--s2) var(--safe-bottom);
+  background: var(--glass);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-top: 1px solid var(--line);
+}
+.tabbar[hidden] { display: none; }
+.tab {
+  flex: 1; max-width: 10rem; min-height: var(--tabbar-h);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px;
+  color: var(--ink-2);
+  font: var(--brand-s); text-transform: uppercase; letter-spacing: 0.04em;
+  transition: color var(--fast) var(--ease);
+}
+.tab:hover, .tab[aria-current] { color: var(--ink); }
+.tab .i { width: 24px; height: 24px; }
+.tab[aria-current] .i { stroke-width: 2; }
 
 /* --- Diálogos: confirmar, pedir texto, elegir y hojas de acciones --- */
 .confirm-overlay {

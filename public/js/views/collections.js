@@ -1,6 +1,6 @@
 import { $app, api, h, escapeHtml } from '../app.js';
 import { icon } from '../icons.js';
-import { promptDialog, segmentNav, toast } from '../ui.js';
+import { promptDialog, toast } from '../ui.js';
 import { visibleDescription } from '../collection-text.js';
 
 // Top-level list of collections (folders/albums/setlists).
@@ -11,13 +11,11 @@ export async function collectionsView() {
         <h1 class="brand">OpenTabs</h1>
         <button class="btn primary" id="new-col">${icon('plus')} New</button>
       </div>
-      <div id="seg"></div>
     </header>
     <main class="content">
       <ul class="songlist" id="list"><li class="spinner">Loading…</li></ul>
     </main>`;
 
-  document.getElementById('seg').append(segmentNav('collections'));
   const $list = document.getElementById('list');
 
   async function load() {

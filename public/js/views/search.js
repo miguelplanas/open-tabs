@@ -12,7 +12,6 @@ const OFFLINE = 'You are offline. Online search needs a connection.';
 export async function searchView([params] = []) {
   $app.innerHTML = `
     <header class="topbar">
-      <button class="btn icon" id="back" title="Back" aria-label="Back">${icon('chevron-left')}</button>
       <h1>Search online</h1>
       <select id="source" class="btn"></select>
     </header>
@@ -33,7 +32,6 @@ export async function searchView([params] = []) {
       <ul class="songlist" id="results"></ul>
     </main>`;
 
-  document.getElementById('back').onclick = () => (location.hash = '#/');
   const $source = document.getElementById('source');
   const $q = document.getElementById('q');
   const $results = document.getElementById('results');

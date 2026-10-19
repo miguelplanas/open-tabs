@@ -1,7 +1,7 @@
 import { $app, api, h, escapeHtml, debounce } from '../app.js';
 import { icon } from '../icons.js';
 import {
-  segmentNav, groupVersions, versionPickerDialog, onLongPress, songActionsSheet,
+  groupVersions, versionPickerDialog, onLongPress, songActionsSheet,
 } from '../ui.js';
 import { onlineSearchHash } from '../search-route.js';
 
@@ -20,12 +20,8 @@ export async function libraryView() {
     <header class="topbar">
       <div class="topbar-row">
         <h1 class="brand">OpenTabs <span class="count" id="count"></span></h1>
-        <button class="btn icon" id="go-search" title="Search online" aria-label="Search online">${icon('globe')}</button>
-        <button class="btn primary" id="go-new">${icon('plus')} New</button>
-      </div>
-      <div class="topbar-row">
-        <div id="seg"></div>
         <button class="btn quiet theme-toggle" type="button" data-theme-toggle aria-label="Cambiar tema claro u oscuro"></button>
+        <button class="btn primary" id="go-new">${icon('plus')} New</button>
       </div>
     </header>
     <main class="content">
@@ -38,8 +34,6 @@ export async function libraryView() {
     </main>`;
 
   document.getElementById('go-new').onclick = () => (location.hash = '#/new');
-  document.getElementById('go-search').onclick = () => (location.hash = '#/search');
-  document.getElementById('seg').append(segmentNav('songs'));
 
   const $q = document.getElementById('q');
   const $list = document.getElementById('list');

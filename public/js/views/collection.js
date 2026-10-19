@@ -1,6 +1,6 @@
 import { $app, api, h, escapeHtml } from '../app.js';
 import { icon } from '../icons.js';
-import { promptDialog, confirmDialog, toast, onLongPress, songActionsSheet } from '../ui.js';
+import { promptDialog, confirmDialog, toast, onLongPress, songActionsSheet, openOverlay } from '../ui.js';
 import { visibleDescription } from '../collection-text.js';
 
 const SETLIST_KEY = 'opentabs.setlist';
@@ -205,22 +205,10 @@ export async function collectionView([id]) {
           </div>
         </div>
       </div>`);
-    document.body.append(overlay);
-    requestAnimationFrame(() => overlay.classList.add('show'));
     const $q = overlay.querySelector('#pk-q');
     const $pkList = overlay.querySelector('#pk-list');
-
-    function close() {
-      document.removeEventListener('keydown', onKey);
-      overlay.classList.remove('show');
-      const remove = () => overlay.remove();
-      overlay.addEventListener('transitionend', remove, { once: true });
-      setTimeout(remove, 400);
-    }
-    function onKey(e) { if (e.key === 'Escape') close(); }
-    document.addEventListener('keydown', onKey);
-    overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
-    overlay.querySelector('#pk-done').onclick = close;
+    const close = openOverlay(overlay);
+    overlay.querySelector('#pk-done').onclick = () => close();
 
     function renderPicker() {
       const q = $q.value.trim().toLowerCase();

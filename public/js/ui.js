@@ -447,21 +447,6 @@ export async function addToCollectionDialog(song) {
   };
 }
 
-// Segmented Songs/Collections switcher shared by the two top-level list views.
-// `active` is 'songs' or 'collections'; navigates via hash on click.
-export function segmentNav(active) {
-  const nav = h(`
-    <nav class="segments" role="tablist" aria-label="Library sections">
-      <button class="segment${active === 'songs' ? ' active' : ''}" role="tab" data-hash="#/">Songs</button>
-      <button class="segment${active === 'collections' ? ' active' : ''}" role="tab" data-hash="#/collections">Collections</button>
-    </nav>`);
-  for (const btn of nav.querySelectorAll('.segment')) {
-    btn.setAttribute('aria-selected', String(btn.classList.contains('active')));
-    btn.onclick = () => { if (!btn.classList.contains('active')) location.hash = btn.dataset.hash; };
-  }
-  return nav;
-}
-
 // Promise-based replacement for confirm() that matches the app's visual language.
 export function confirmDialog(message, { danger = false, confirmLabel = 'Confirm', cancelLabel = 'Cancel' } = {}) {
   return new Promise((resolve) => {

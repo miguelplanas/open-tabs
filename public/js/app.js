@@ -8,6 +8,8 @@ import { collectionView } from './views/collection.js';
 import { loginView } from './views/login.js';
 import { createNav } from './nav.js';
 import { planWarm, nextManifest } from './offline.js';
+import { TABS, tabForHash } from './tabs.js';
+import { icon } from './icons.js';
 
 export const $app = document.getElementById('app');
 
@@ -61,6 +63,30 @@ const routes = [
 let teardown = null;
 const nav = createNav();
 
+// Bottom tab bar: drawn once, outside #app, so views never repaint it. Each
+// navigation only moves the lit tab, or hides the bar on screens that have no
+// tab (reader, editor, preview, login; see tabs.js). body.has-tabbar is what
+// lets the CSS keep list content and toasts clear of it.
+const $tabbar = h(`<nav class="tabbar" aria-label="Sections" hidden>${TABS.map((t) => `
+  <a class="tab" href="${t.hash}" data-tab="${t.id}">${icon(t.icon)}<span>${t.label}</span></a>`).join('')}
+</nav>`);
+document.body.append($tabbar);
+// Tapping the tab you are already on takes you back to its top, like iOS.
+$tabbar.addEventListener('click', (e) => {
+  const a = e.target.closest('.tab');
+  if (a && location.hash === a.getAttribute('href')) window.scrollTo({ top: 0, behavior: 'smooth' });
+});
+
+function updateTabbar(hash) {
+  const active = tabForHash(hash);
+  $tabbar.hidden = !active;
+  document.body.classList.toggle('has-tabbar', Boolean(active));
+  for (const a of $tabbar.querySelectorAll('.tab')) {
+    if (a.dataset.tab === active) a.setAttribute('aria-current', 'page');
+    else a.removeAttribute('aria-current');
+  }
+}
+
 // List views remember where you left them: opening a song from halfway down
 // the library and coming back should not dump you at the top of the list
 // again. Keyed by hash, so every collection keeps its own place. The reader is
@@ -88,6 +114,7 @@ async function route() {
   if (typeof teardown === 'function') teardown();
   teardown = null;
   const hash = location.hash || '#/';
+  updateTabbar(hash);
   for (const r of routes) {
     const m = hash.match(r.re);
     if (m) {

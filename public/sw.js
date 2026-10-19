@@ -21,6 +21,7 @@ const SHELL = [
   '/js/icons.js', '/js/theme.js',
   '/fonts/host-grotesk.woff2', '/fonts/plex-mono-400.woff2', '/fonts/plex-mono-500.woff2', '/js/busy.js', '/js/offline.js', '/js/setlist.js',
   '/js/collection-text.js', '/js/search-history.js',
+  '/js/tabs.js',
   '/js/views/library.js', '/js/views/reader.js', '/js/views/editor.js',
   '/js/views/search.js', '/js/views/preview.js', '/js/views/login.js',
   '/js/views/collections.js', '/js/views/collection.js',

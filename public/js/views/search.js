@@ -1,10 +1,12 @@
 import { $app, api, h, escapeHtml, debounce } from '../app.js';
 import { icon } from '../icons.js';
 import { toast } from '../ui.js';
+import { addRecent, loadRecent, saveRecent, parseLink } from '../search-history.js';
 
 // Remembers the last online search for the session, so after importing one
 // version the user can come back and grab another without retyping.
 const STATE_KEY = 'opentabs.searchState';
+const OFFLINE = 'You are offline. Online search needs a connection.';
 
 export async function searchView() {
   $app.innerHTML = `
@@ -15,6 +17,17 @@ export async function searchView() {
     </header>
     <main class="content">
       <input class="searchbox" id="q" type="search" placeholder="Song, artist, or paste a tab URL…" autocomplete="off">
+      <div class="search-start" id="start" hidden>
+        <p class="search-hint">Search for a song or artist, or paste a link to a tab.</p>
+        <button type="button" class="btn" id="paste" hidden>${icon('clipboard')} Paste link</button>
+        <div id="recent" hidden>
+          <div class="search-recent-head">
+            <h2 class="label">Recent</h2>
+            <button type="button" class="btn quiet" id="clear-recent">Clear</button>
+          </div>
+          <ul class="songlist" id="recent-list"></ul>
+        </div>
+      </div>
       <div class="chips" id="types" hidden></div>
       <ul class="songlist" id="results"></ul>
     </main>`;
@@ -24,12 +37,20 @@ export async function searchView() {
   const $q = document.getElementById('q');
   const $results = document.getElementById('results');
   const $types = document.getElementById('types');
+  const $start = document.getElementById('start');
+  const $recent = document.getElementById('recent');
+  const $recentList = document.getElementById('recent-list');
+  const $paste = document.getElementById('paste');
 
   let sourcesList = [];
   try {
     sourcesList = await api('/sources');
   } catch (err) {
     if (err.message === 'unauthorized') return;
+    if (!navigator.onLine) {
+      $results.innerHTML = `<li class="empty">${OFFLINE}</li>`;
+      return;
+    }
   }
   if (sourcesList.length === 0) {
     $results.innerHTML = `<li class="empty">No tab sources configured.<br>
@@ -132,16 +153,14 @@ export async function searchView() {
 
   // A pasted tab URL skips search and imports directly through whichever
   // provider claims its hostname (providers export `hosts`).
-  function asTabUrl(q) {
-    if (!/^https?:\/\//i.test(q)) return null;
-    try { return new URL(q); } catch { return null; }
-  }
+  const asTabUrl = parseLink;
 
   async function search() {
     const my = ++gen;
     const q = $q.value.trim();
     $types.hidden = true;
-    if (!q) { $results.innerHTML = ''; sessionStorage.removeItem(STATE_KEY); return; }
+    if (!q) { $results.innerHTML = ''; sessionStorage.removeItem(STATE_KEY); showStart(); return; }
+    $start.hidden = true;
 
     const pasted = asTabUrl(q);
     if (pasted) {
@@ -168,10 +187,13 @@ export async function searchView() {
       activeType = null;
       openKeys = new Set();
       sessionStorage.setItem(STATE_KEY, JSON.stringify({ source: $source.value, q }));
+      saveRecent(localStorage, addRecent(loadRecent(localStorage), q));
       renderResults();
     } catch (err) {
       if (my !== gen) return;
-      $results.innerHTML = `<li class="empty error">${escapeHtml(err.message)}</li>`;
+      $results.innerHTML = navigator.onLine
+        ? `<li class="empty error">${escapeHtml(err.message)}</li>`
+        : `<li class="empty">${OFFLINE}</li>`;
     }
   }
 
@@ -193,6 +215,49 @@ export async function searchView() {
     }
   }
 
+  // Start page, shown while the box is empty: recent searches and a way to
+  // import a link straight from the clipboard.
+  function showStart() {
+    const recent = loadRecent(localStorage);
+    $recent.hidden = recent.length === 0;
+    $recentList.innerHTML = '';
+    for (const q of recent) {
+      const li = h(`<li><a href="javascript:void 0"><div class="title">${escapeHtml(q)}</div></a></li>`);
+      li.querySelector('a').onclick = () => { $q.value = q; search(); };
+      $recentList.append(li);
+    }
+    $start.hidden = false;
+  }
+
+  document.getElementById('clear-recent').onclick = () => {
+    saveRecent(localStorage, []);
+    showStart();
+  };
+
+  // Reading the clipboard needs a tap (iOS asks each time), so it happens
+  // here rather than on load.
+  if (navigator.clipboard?.readText) {
+    $paste.hidden = false;
+    $paste.onclick = async () => {
+      let text = '';
+      try {
+        text = await navigator.clipboard.readText();
+      } catch {
+        toast('Could not read the clipboard', { danger: true });
+        return;
+      }
+      const link = parseLink(text);
+      if (!link) { toast('No link in the clipboard'); return; }
+      $q.value = link.href;
+      search();
+    };
+  }
+
+  // Another source answers the same query differently: run it again there.
+  $source.addEventListener('change', () => {
+    if ($q.value.trim()) search();
+  });
+
   const debouncedSearch = debounce(search, 500);
   $q.addEventListener('input', debouncedSearch);
   $q.addEventListener('keydown', (e) => {
@@ -208,6 +273,7 @@ export async function searchView() {
       search();
     }
   } catch { /* start blank */ }
+  if (!$q.value) showStart();
   $q.focus();
 
   return () => debouncedSearch.cancel();

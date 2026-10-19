@@ -1,6 +1,7 @@
 import { h, escapeHtml, api } from './app.js';
 import { icon } from './icons.js';
 import { createOverlayRegistry } from './overlays.js';
+import { normalizeName } from './library-order.js';
 
 // --- Overlays ------------------------------------------------------------
 // Every sheet and dialog goes through openOverlay(): it shows the scrim,
@@ -71,8 +72,8 @@ export function toast(message, { danger = false, duration = 3200 } = {}) {
 // server/db.js). Nothing about the grouping is stored, so it recomputes itself
 // whenever songs are imported, edited or deleted.
 
-export const normalizeName = (s) =>
-  String(s ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase();
+// normalizeName lives in library-order.js, which has no DOM and so is testable.
+export { normalizeName };
 
 export const groupKey = (song) =>
   `${normalizeName(song.title)}|${normalizeName(song.artist)}`;

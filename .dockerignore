@@ -9,7 +9,6 @@ data/
 .gitignore
 .claude/
 docs/
-deploy/
 test/
 tasks.md
 .agents/

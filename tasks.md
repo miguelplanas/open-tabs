@@ -57,7 +57,6 @@
 - [ ] Backups: nightly `sqlite3 .backup` (or `scripts/backup-db.js`)
   to a dated file, with retention. Now that the library is real data again,
   this is the most urgent item on the list.
-- [ ] `/healthz` endpoint plus a systemd unit for the Proxmox LXC.
 - [ ] Metronome / tap tempo, and deriving autoscroll speed from BPM.
 - [ ] Full-text search over tab bodies (SQLite FTS5), not just title/artist.
 - [ ] A tuner (getUserMedia plus autocorrelation), the one Ultimate Guitar

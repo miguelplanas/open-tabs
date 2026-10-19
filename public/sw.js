@@ -19,7 +19,7 @@ const SHELL = [
   '/', '/index.html', '/css/base.css', '/css/app.css', '/manifest.webmanifest',
   '/js/app.js', '/js/nav.js', '/js/chords.js', '/js/ui.js', '/js/chord-shapes.js',
   '/js/icons.js', '/js/theme.js',
-  '/fonts/host-grotesk.woff2', '/fonts/plex-mono-400.woff2', '/fonts/plex-mono-500.woff2', '/js/busy.js', '/js/offline.js', '/js/setlist.js',
+  '/fonts/host-grotesk.woff2', '/fonts/plex-mono-400.woff2', '/fonts/plex-mono-500.woff2', '/js/busy.js', '/js/offline.js', '/js/setlist.js', '/js/overlays.js',
   '/js/collection-text.js', '/js/search-history.js',
   '/js/tabs.js',
   '/js/views/library.js', '/js/views/reader.js', '/js/views/editor.js',

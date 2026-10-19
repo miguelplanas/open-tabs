@@ -1,5 +1,46 @@
 import { h, escapeHtml, api } from './app.js';
 import { icon } from './icons.js';
+import { createOverlayRegistry } from './overlays.js';
+
+// --- Overlays ------------------------------------------------------------
+// Every sheet and dialog goes through openOverlay(): it shows the scrim,
+// closes on Escape or a tap outside, and registers the overlay so the router
+// can close them all on navigation (closeAllOverlays in app.js's route()).
+// Closing on navigation counts as dismissing: a pending confirm resolves to
+// false, a prompt to null.
+const overlays = createOverlayRegistry();
+export const closeAllOverlays = () => overlays.closeAll();
+
+// Returns close(result). onClose(result) runs once, however it closed.
+// onKey sees the other keys. scrimGuardMs ignores taps on the scrim for that
+// long after opening (see openSheet).
+export function openOverlay(overlay, { dismissValue, onClose, onKey, scrimGuardMs = 0 } = {}) {
+  document.body.append(overlay);
+  requestAnimationFrame(() => overlay.classList.add('show'));
+  let closed = false;
+  function close(result) {
+    if (closed) return;
+    closed = true;
+    unregister();
+    document.removeEventListener('keydown', keydown);
+    overlay.classList.remove('show');
+    const remove = () => overlay.remove();
+    overlay.addEventListener('transitionend', remove, { once: true });
+    setTimeout(remove, 400);
+    onClose?.(result);
+  }
+  function keydown(e) {
+    if (e.key === 'Escape') close(dismissValue);
+    else onKey?.(e);
+  }
+  document.addEventListener('keydown', keydown);
+  const openedAt = Date.now();
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay && Date.now() - openedAt > scrimGuardMs) close(dismissValue);
+  });
+  const unregister = overlays.add(() => close(dismissValue));
+  return close;
+}
 
 let toastRoot;
 function toastStack() {
@@ -87,20 +128,8 @@ export function versionPickerDialog(versions, { currentId = null, onPick = null 
         </div>
       </div>
     </div>`);
-  document.body.append(overlay);
-  requestAnimationFrame(() => overlay.classList.add('show'));
-
-  function close() {
-    document.removeEventListener('keydown', onKey);
-    overlay.classList.remove('show');
-    const remove = () => overlay.remove();
-    overlay.addEventListener('transitionend', remove, { once: true });
-    setTimeout(remove, 400);
-  }
-  function onKey(e) { if (e.key === 'Escape') close(); }
-  document.addEventListener('keydown', onKey);
-  overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
-  overlay.querySelector('#vp-close').onclick = close;
+  const close = openOverlay(overlay);
+  overlay.querySelector('#vp-close').onclick = () => close();
 
   const list = overlay.querySelector('#vp-list');
   for (const v of versions) {
@@ -290,26 +319,11 @@ export function openSheet(content) {
       <div class="confirm-box sheet" role="dialog" aria-modal="true"></div>
     </div>`);
   overlay.firstElementChild.append(content);
-  document.body.append(overlay);
-  requestAnimationFrame(() => overlay.classList.add('show'));
-
-  function close() {
-    document.removeEventListener('keydown', onKey);
-    overlay.classList.remove('show');
-    const remove = () => overlay.remove();
-    overlay.addEventListener('transitionend', remove, { once: true });
-    setTimeout(remove, 400);
-  }
-  function onKey(e) { if (e.key === 'Escape') close(); }
-  document.addEventListener('keydown', onKey);
   // A sheet raised by a long press opens with the finger still down, and the
   // click that ends that press lands on the fresh scrim: ignore taps outside
   // for as long as that one can still arrive.
-  const openedAt = Date.now();
-  overlay.addEventListener('click', (e) => {
-    if (e.target === overlay && Date.now() - openedAt > 400) close();
-  });
-  return { close };
+  const close = openOverlay(overlay, { scrimGuardMs: 400 });
+  return { close: () => close() };
 }
 
 // Promise-based text prompt matching the app's visual language. Resolves to the
@@ -329,29 +343,18 @@ export function promptDialog(message, {
           </div>
         </div>
       </div>`);
-    document.body.append(overlay);
     const input = overlay.querySelector('#p-input');
     input.value = value;
-    requestAnimationFrame(() => { overlay.classList.add('show'); input.focus(); input.select(); });
-
-    function close(result) {
-      document.removeEventListener('keydown', onKey);
-      overlay.classList.remove('show');
-      const remove = () => overlay.remove();
-      overlay.addEventListener('transitionend', remove, { once: true });
-      setTimeout(remove, 400);
-      resolve(result);
-    }
+    const close = openOverlay(overlay, {
+      dismissValue: null,
+      onClose: resolve,
+      onKey: (e) => { if (e.key === 'Enter') { e.preventDefault(); submit(); } },
+    });
+    requestAnimationFrame(() => { input.focus(); input.select(); });
     function submit() {
       const v = input.value.trim();
       close(v === '' ? null : v);
     }
-    function onKey(e) {
-      if (e.key === 'Escape') close(null);
-      if (e.key === 'Enter') { e.preventDefault(); submit(); }
-    }
-    document.addEventListener('keydown', onKey);
-    overlay.addEventListener('click', (e) => { if (e.target === overlay) close(null); });
     overlay.querySelector('#p-cancel').onclick = () => close(null);
     overlay.querySelector('#p-ok').onclick = submit;
   });
@@ -381,20 +384,8 @@ export async function addToCollectionDialog(song) {
       </div>
     </div>`);
   const list = overlay.querySelector('#pk-list');
-  document.body.append(overlay);
-  requestAnimationFrame(() => overlay.classList.add('show'));
-
-  function close() {
-    document.removeEventListener('keydown', onKey);
-    overlay.classList.remove('show');
-    const remove = () => overlay.remove();
-    overlay.addEventListener('transitionend', remove, { once: true });
-    setTimeout(remove, 400);
-  }
-  function onKey(e) { if (e.key === 'Escape') close(); }
-  document.addEventListener('keydown', onKey);
-  overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
-  overlay.querySelector('#pk-done').onclick = close;
+  const close = openOverlay(overlay);
+  overlay.querySelector('#pk-done').onclick = () => close();
 
   function renderRow(col) {
     const row = h(`
@@ -460,21 +451,7 @@ export function confirmDialog(message, { danger = false, confirmLabel = 'Confirm
           </div>
         </div>
       </div>`);
-    document.body.append(overlay);
-    requestAnimationFrame(() => overlay.classList.add('show'));
-
-    function close(result) {
-      document.removeEventListener('keydown', onKey);
-      overlay.classList.remove('show');
-      const remove = () => overlay.remove();
-      overlay.addEventListener('transitionend', remove, { once: true });
-      setTimeout(remove, 400);
-      resolve(result);
-    }
-    function onKey(e) { if (e.key === 'Escape') close(false); }
-
-    document.addEventListener('keydown', onKey);
-    overlay.addEventListener('click', (e) => { if (e.target === overlay) close(false); });
+    const close = openOverlay(overlay, { dismissValue: false, onClose: resolve });
     overlay.querySelector('#c-cancel').onclick = () => close(false);
     overlay.querySelector('#c-ok').onclick = () => close(true);
   });

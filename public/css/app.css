@@ -144,6 +144,8 @@ select.btn, select.btn:hover {
   padding: var(--s4) var(--s2) var(--s2);
   border-bottom: 1px solid var(--line);
 }
+/* Última fila de una búsqueda en la biblioteca: la misma búsqueda, online. */
+.songlist .search-online a { display: flex; align-items: center; justify-content: space-between; gap: var(--s2); color: var(--ink-2); }
 .songlist .group-header:first-child { padding-top: var(--s1); }
 .badge {
   display: inline-block; font-size: 13px; font-weight: 500; line-height: 1.3;

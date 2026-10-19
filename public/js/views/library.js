@@ -3,6 +3,7 @@ import { icon } from '../icons.js';
 import {
   groupVersions, versionPickerDialog, onLongPress, songActionsSheet,
 } from '../ui.js';
+import { onlineSearchHash } from '../search-route.js';
 
 const PREFS_KEY = 'opentabs.libraryPrefs';
 
@@ -66,10 +67,12 @@ export async function libraryView() {
     const cmp = SORTS[$sort.value].cmp;
     if (cmp) groups = [...groups].sort((a, b) => cmp(a[0], b[0]));
 
+    const q = $q.value.trim();
     if (groups.length === 0) {
       $list.innerHTML = `<li class="empty"><div class="strings"></div>${
-        $q.value ? 'No songs match.' : 'Your library is empty.<br>Add a song, or search online to import one.'
+        q ? 'No songs match.' : 'Your library is empty.<br>Add a song, or search online to import one.'
       }</li>`;
+      if (q) $list.append(searchOnlineItem(q));
       return;
     }
 
@@ -88,6 +91,16 @@ export async function libraryView() {
     } else {
       for (const g of groups) $list.append(songItem(g, false, dropSong));
     }
+    if (q) $list.append(searchOnlineItem(q));
+  }
+
+  // Last row of a filtered library: the same query, run online.
+  function searchOnlineItem(q) {
+    const li = h(`<li class="search-online"><a></a></li>`);
+    const a = li.querySelector('a');
+    a.href = onlineSearchHash(q);
+    a.innerHTML = `<span>Search “${escapeHtml(q)}” online</span>${icon('chevron-right')}`;
+    return li;
   }
 
   // Songs, not rows: a song with three versions counts once. Only meaningful

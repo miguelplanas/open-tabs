@@ -163,6 +163,18 @@ test('reflow binds each chord to the word underneath it', () => {
   assert.match(out, /class="chord">G<\/span><\/span><span class="ly">world/);
 });
 
+test('reflow gives a chord slot only to words that carry a chord', () => {
+  // A wrapped lyric must continue right below: a word with no chord over it
+  // reserves no chord row, or the wrap shows up as a blank line.
+  const out = renderBody('G\nY ahora está tan cerca, casi ya la puedo oler', 0, { reflow: true });
+  assert.equal(out.match(/class="word"/g).length, 10);
+  assert.equal(out.match(/class="ch"/g).length, 1);
+  assert.match(out, /<span class="word"><span class="cell"><span class="ly">oler<\/span><\/span><\/span>/);
+  // A chord landing mid-word: the leading slice has no slot, the rest does.
+  const split = renderBody('  G\nhello', 0, { reflow: true });
+  assert.match(split, /<span class="cell"><span class="ly">he<\/span><\/span><span class="cell"><span class="ch">/);
+});
+
 test('reflow splits a word when a chord lands inside it', () => {
   // The G sits on the fourth character of "hello", so the word becomes two
   // cells and stays one unbreakable word.

@@ -41,7 +41,10 @@ Herramienta, no escaparate: clara, sobria, rápida, con el aspecto de algo hecho
 Ficha de esta app (rellénala al crearla):
 
 - Rasgo propio: las seis cuerdas (`.strings`, separador con seis líneas, la más gruesa abajo, como en el mástil) y el riel de trastes (`.fret-rail`, puntos de los trastes 3-5-7-9 y la octava en el 12 en el borde derecho del lector; el punto marca por dónde vas).
-- Lo demás propio de la app: el cuerpo de la tab va en monoespaciada (ahí la alineación es el significado) y los acordes en azul (`--chord`), el único color con significado de la app, con contraste AA en claro y en oscuro. El modo oscuro es el del escenario: tiene que leerse bien con poca luz.
+- Sin color de acento ni `--hue`: lo activo (pestaña, segmento, chip, botón principal) es tinta y peso 500.
+- Lo demás propio de la app: el cuerpo de la tab va en IBM Plex Mono (ahí la alineación es el significado) y los acordes en azul (`--chord`), el único color con significado de la app, con contraste AA en claro y en oscuro. El modo oscuro es el del escenario: tiene que leerse bien con poca luz.
+- Decisión de los acordes (19-10-2026): se probó a dejarlos en tinta 500 sin color (capturas en el iPhone, claro y oscuro). No basta: Plex Mono solo tiene 400 y 500, y a la distancia del atril el acorde se confunde con la letra, con las secciones (`[Intro]`, también 500) y con anotaciones como `x4`. Se queda un solo azul contenido, que significa "esto es un acorde"; nada más en la app lleva color.
+- Cabeceras de grupo de la biblioteca (letra en A-Z, artista en Artist): voz Tech (`--tech-m`) en `--ink-2` con línea de tinta debajo, para que se lean como etiqueta de sección y no como otra canción. Etiquetas de fila (`capo 3`, `2 versions`) en Tech entre corchetes.
 
 ## Overview
 

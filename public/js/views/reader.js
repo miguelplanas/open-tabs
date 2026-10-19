@@ -11,6 +11,7 @@ import {
   enableChordPopovers, hideChordPopover, showChordPopover, chordShape, diagramSvg,
 } from '../chord-shapes.js';
 import { swapSetlistSong } from '../setlist.js';
+import { speedForDuration, formatRemaining, formatDuration, parseDuration } from '../autoscroll.js';
 
 // Autoscroll speed is persisted per song in pixels/second, but the reader
 // exposes it as a 1..20 "level": the dock then has memorable steps and the
@@ -40,6 +41,10 @@ const WAKE_IDLE_MS = 20 * 60 * 1000;
 
 // How long the dock stays fully visible after you touch it while playing.
 const DOCK_DIM_MS = 2600;
+
+// Seconds of countdown between pressing play and the first scroll, to get the
+// phone down and the guitar up.
+const COUNTDOWN_S = 3;
 
 export async function readerView([id]) {
   let song;
@@ -124,6 +129,7 @@ export async function readerView([id]) {
         <span class="dock-level" id="lvl" title="Autoscroll speed" aria-live="polite"></span>
         <button id="spd-up" aria-label="Scroll faster">${icon('plus')}</button>
       </div>
+      <span class="dock-remain tech" id="remain" hidden aria-label="Time remaining"></span>
       <button class="btn primary icon play" id="play" title="Autoscroll" aria-label="Start autoscroll">${icon('play', { cls: 'fill' })}</button>
     </div>`;
 
@@ -131,6 +137,7 @@ export async function readerView([id]) {
   const $play = document.getElementById('play');
   const $dock = document.getElementById('dock');
   const $lvl = document.getElementById('lvl');
+  const $remain = document.getElementById('remain');
   const $sub = document.getElementById('sub');
   const $progress = document.getElementById('progress');
   const $head = document.getElementById('head');
@@ -325,11 +332,38 @@ export async function readerView([id]) {
     syncMeta();
   }
 
+  // Time left at the current speed, in the dock while playing. Only touches
+  // the DOM when the text changes (about once a second).
+  function updateRemaining() {
+    const text = playing && Number.isFinite(endLimit)
+      ? formatRemaining(endLimit - window.scrollY, speed) : '';
+    $remain.hidden = !text;
+    if ($remain.textContent !== text) $remain.textContent = text;
+  }
+
+  // Song length at the current speed, for the tools sheet: the distance from
+  // the top to the end limit, over the speed.
+  const totalSeconds = () => (Number.isFinite(endLimit) && speed > 0 ? endLimit / speed : 0);
+
+  // Set the speed from "the song should last mm:ss". The stored scroll_speed
+  // is already px/s (a real number), so nothing changes server-side.
+  function setDuration(seconds) {
+    const px = speedForDuration(endLimit, seconds);
+    if (px === null) return false;
+    speed = px;
+    level = speedToLevel(speed);
+    dirty = true;
+    syncMeta();
+    updateRemaining();
+    return true;
+  }
+
   function setLevel(n) {
     level = Math.min(MAX_LEVEL, Math.max(MIN_LEVEL, Math.round(n) || MIN_LEVEL));
     speed = levelToSpeed(level);
     dirty = true;
     syncMeta();
+    updateRemaining();
   }
 
   document.getElementById('spd-down').onclick = () => setLevel(level - 1);
@@ -371,6 +405,12 @@ export async function readerView([id]) {
           <input type="range" id="sheet-speed" min="${MIN_LEVEL}" max="${MAX_LEVEL}"
                  step="1" value="${level}" aria-label="Autoscroll speed">
         </div>
+        <div class="tool-row">
+          <label class="tool-label" for="sheet-dur">Song length at this speed</label>
+          <input class="tech dur-input" id="sheet-dur" inputmode="numeric" autocomplete="off"
+                 placeholder="m:ss" aria-describedby="dur-hint">
+        </div>
+        <p class="small muted" id="dur-hint">Type a length such as 3:30 and the speed is set to match.</p>
         <div class="tool-actions">
           <button class="btn" id="t-collection">Add to collection</button>
           <button class="btn" id="t-edit">Edit song</button>
@@ -406,7 +446,24 @@ export async function readerView([id]) {
     };
     el.querySelector('#fs-down').onclick = () => setFont(fontSize - 1);
     el.querySelector('#fs-up').onclick = () => setFont(fontSize + 1);
-    el.querySelector('#sheet-speed').oninput = (e) => setLevel(Number(e.target.value));
+    el.querySelector('#sheet-speed').oninput = (e) => {
+      setLevel(Number(e.target.value));
+      $dur.value = formatDuration(totalSeconds());
+    };
+    const $dur = el.querySelector('#sheet-dur');
+    $dur.value = formatDuration(totalSeconds());
+    $dur.onchange = () => {
+      const secs = parseDuration($dur.value);
+      if (secs === null || !setDuration(secs)) {
+        $dur.setAttribute('aria-invalid', 'true');
+        return;
+      }
+      $dur.removeAttribute('aria-invalid');
+      // The speed may have been clamped: show the length it really gives.
+      $dur.value = formatDuration(totalSeconds());
+      const slider = el.querySelector('#sheet-speed');
+      slider.value = String(level);
+    };
     el.querySelector('#t-collection').onclick = () => { sheet.close(); addToCollectionDialog(song); };
     el.querySelector('#t-edit').onclick = () => { sheet.close(); location.hash = '#/edit/' + song.id; };
     syncMeta();
@@ -467,14 +524,49 @@ export async function readerView([id]) {
       }
     }
     last = ts;
+    updateRemaining();
     raf = requestAnimationFrame(step);
   }
 
-  function toggle(on = !playing) {
-    playing = on;
+  // Pressing play starts a short countdown shown on the button; pressing
+  // again (or Space, or a double tap) while it runs cancels it. No animation:
+  // the number just changes once a second, so reduced motion needs nothing.
+  let counting = null;
+  function showPlayButton() {
     $play.innerHTML = icon(playing ? 'pause' : 'play', { cls: 'fill' });
-    $play.classList.toggle('playing', playing);
+    $play.classList.remove('counting');
     $play.setAttribute('aria-label', playing ? 'Pause autoscroll' : 'Start autoscroll');
+  }
+  function cancelCountdown() {
+    clearInterval(counting);
+    counting = null;
+    showPlayButton();
+  }
+  function startCountdown() {
+    let n = COUNTDOWN_S;
+    const paint = () => {
+      $play.innerHTML = `<span class="count-num">${n}</span>`;
+      $play.classList.add('counting');
+      $play.setAttribute('aria-label', `Starting in ${n}, tap to cancel`);
+    };
+    paint();
+    counting = setInterval(() => {
+      n -= 1;
+      if (n > 0) { paint(); return; }
+      cancelCountdown();
+      toggle(true, true);
+    }, 1000);
+    keepAwake();
+    pokeDock();
+  }
+
+  function toggle(on = !playing, now = false) {
+    if (counting) { cancelCountdown(); return; }
+    if (on && !playing && !now) { startCountdown(); return; }
+    playing = on;
+    showPlayButton();
+    $play.classList.toggle('playing', playing);
+    updateRemaining();
     last = 0; acc = 0;
     if (playing) raf = requestAnimationFrame(step);
     else if (raf) cancelAnimationFrame(raf);
@@ -588,6 +680,7 @@ export async function readerView([id]) {
     window.removeEventListener('pagehide', flushSettings);
     if (raf) cancelAnimationFrame(raf);
     clearTimeout(wakeIdle);
+    clearInterval(counting);
     clearTimeout(dimT);
     releaseWake();
     flushSettings();

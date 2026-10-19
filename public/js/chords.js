@@ -129,11 +129,18 @@ function chordColumns(line) {
 // `chords` is a list because two chords can share a column (a change on the
 // same syllable). Each one stays its own .chord span: merging them into one
 // would silently stop them transposing and break the fingering popover.
+//
+// A cell with no chord gets no chord slot at all. The slot reserves a line of
+// height, so an empty one on every plain word left a blank line wherever a
+// lyric wrapped onto a visual line with no chord above it ("puedo" / blank /
+// "oler"). Without it, a wrapped line only grows a chord row when one of its
+// words actually carries a chord.
 function cellHtml(chords, text, semitones) {
   const top = chords
     .map((c) => `<span class="chord">${escapeHtml(transposeChord(c, semitones))}</span>`)
     .join(' ');
-  return `<span class="cell"><span class="ch">${top}</span><span class="ly">${escapeHtml(text)}</span></span>`;
+  const slot = top ? `<span class="ch">${top}</span>` : '';
+  return `<span class="cell">${slot}<span class="ly">${escapeHtml(text)}</span></span>`;
 }
 
 // One chord line plus its lyric line, as wrappable words.

@@ -39,3 +39,10 @@ test('the service worker precaches tabs.js', () => {
   const sw = readFileSync(new URL('../public/sw.js', import.meta.url), 'utf8');
   assert.match(sw, /'\/js\/tabs\.js'/);
 });
+
+test('the tab bar has an opaque background so list rows do not show through', () => {
+  const css = readFileSync(new URL('../public/css/app.css', import.meta.url), 'utf8');
+  const rule = css.match(/\n\.tabbar \{([^}]*)\}/)[1];
+  assert.match(rule, /background:\s*var\(--bg\)/);
+  assert.doesNotMatch(rule, /--glass|backdrop-filter/);
+});

@@ -522,16 +522,16 @@ body.has-tabbar .toast-stack { bottom: calc(var(--tabbar-h) + var(--s3) + var(--
    Fija y fuera de #app (la pinta app.js una vez). Se esconde en el lector, el
    editor, la vista previa y el login (tabs.js), así nunca tapa el dock ni la
    barra de acción. Navegación principal, así que va en la voz Brand; la
-   pestaña activa se marca con tinta y trazo más grueso, sin color. */
+   pestaña activa se marca con tinta y trazo más grueso, sin color. Fondo
+   opaco: con el cristal translúcido las filas de la lista se leían debajo de
+   las etiquetas. */
 :root { --tabbar-h: 56px; }
 body.has-tabbar { padding-bottom: calc(var(--tabbar-h) + var(--safe-bottom)); }
 .tabbar {
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 30;
   display: flex; justify-content: center;
   padding: 0 var(--s2) var(--safe-bottom);
-  background: var(--glass);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  background: var(--bg);
   border-top: 1px solid var(--line);
 }
 .tabbar[hidden] { display: none; }

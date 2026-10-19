@@ -91,11 +91,19 @@ export function detectKind(body) {
   return 'lyrics';
 }
 
+// Section markers ([Intro], [Verse 1], [Chorus]) as small headings: the
+// brackets are typing convention, not something to read on the stand, so they
+// go and the name stands alone. The original marker stays in the title.
+const SECTION_RE = /^\[(.*)\]\s*$/;
+function sectionHtml(line, cls) {
+  const name = line.trim().match(SECTION_RE)[1].trim();
+  return `<span class="${cls}" role="heading" aria-level="2" title="${escapeHtml(line.trim())}">` +
+    `${escapeHtml(name)}</span>`;
+}
+
 function renderLine(line, semitones) {
   if (!isChordLine(line)) {
-    if (/^\[.*\]\s*$/.test(line.trim())) {
-      return `<span class="section">${escapeHtml(line)}</span>`;
-    }
+    if (SECTION_RE.test(line.trim())) return sectionHtml(line, 'section');
     return escapeHtml(line) || ' ';
   }
   const html = line.replace(/\S+/g, (tok) => {
@@ -223,8 +231,8 @@ export function renderBody(body, semitones = 0, { reflow = false } = {}) {
       if (paired) i++;
       continue;
     }
-    if (/^\[.*\]\s*$/.test(line.trim())) {
-      out.push(`<span class="row section">${escapeHtml(line)}</span>`);
+    if (SECTION_RE.test(line.trim())) {
+      out.push(sectionHtml(line, 'row section'));
       continue;
     }
     // A lyric line with no chords over it still has to wrap on a narrow screen.

@@ -715,3 +715,13 @@ body.has-tabbar { padding-bottom: calc(var(--tabbar-h) + var(--safe-bottom)); }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) .theme-toggle::after { content: "[Light]"; }
 }
+
+/* Lector, pulido: columna de lectura con ancho de atril en pantallas anchas,
+   y la hoja de herramientas con la voz de la portada (etiquetas en tinta,
+   valores en Tech entre corchetes, opciones como segmentos). */
+.song-head, .tabbody { max-width: 960px; margin-inline: auto; }
+.tool-label { color: var(--ink); }
+.tool-seg { flex: none; margin-bottom: 0; }
+.tool-seg .segment { min-width: 64px; }
+.pill span { font: var(--tech-s); }
+.tools .theme-toggle { margin-right: calc(-1 * var(--s2)); }

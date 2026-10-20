@@ -47,12 +47,16 @@ const TEMPLATES = {
   m6: [
     ['A', ['x', 0, 2, 2, 1, 2]], ['E', [0, 2, 2, 0, 2, 0]], ['D', ['x', 'x', 0, 2, 0, 1]],
   ],
+  9: [
+    ['E', [0, 2, 0, 1, 0, 2]], ['A', ['x', 0, 2, 4, 2, 3]],
+    ['C', ['x', 3, 2, 3, 3, 3]], ['D', ['x', 'x', 0, 2, 1, 0]],
+  ],
   add9: [
     ['C', ['x', 3, 2, 0, 3, 0]], ['G', [3, 2, 0, 2, 0, 3]],
     ['D', ['x', 'x', 0, 2, 3, 0]], ['A', ['x', 0, 2, 4, 2, 0]],
   ],
   dim: [ // voiced as dim7
-    ['D', ['x', 'x', 0, 1, 0, 1]],
+    ['A', ['x', 0, 1, 2, 1, 2]], ['E', [0, 1, 2, 0, 2, 0]], ['D', ['x', 'x', 0, 1, 0, 1]],
   ],
   m7b5: [
     ['A', ['x', 0, 1, 0, 1, 'x']], ['D', ['x', 'x', 0, 1, 1, 1]],
@@ -88,14 +92,25 @@ function canonicalQuality(q) {
   if (/7/.test(rest) && (/sus/.test(rest) || ext('4'))) return '7sus4';
   if (/sus|(^|\D)4/.test(rest) || ext('4')) return 'sus4';
   if (/^6/.test(rest) || ext('6')) return '6';
-  if (/^(9|add9)/.test(rest) || (!/\d/.test(rest) && ext('9'))) return 'add9';
+  if (/^add9/.test(rest) || (!/\d/.test(rest) && ext('9'))) return 'add9';
+  if (/^9/.test(rest)) return '9';
   if (/7|11|13/.test(rest)) return '7';
   if (/^5$/.test(rest)) return '5';
   return '';
 }
 
-// Pick the template needing the smallest shift and move it up the neck;
-// open strings under a shift become barre notes at the shift fret.
+// Shapes that move up the neck the way guitarists actually play them: the E
+// and A shapes as barre chords, and the D shape, which mutes the low strings
+// and needs no barre. A C or G shape moved up is technically right but nobody
+// plays G# as 4-3-1-1-1-4, so those only win when nothing else fits.
+const MOVABLE = new Set(['E', 'A', 'D']);
+
+// Open-string pitch classes, low E to high e.
+const OPEN = [4, 9, 2, 7, 11, 4];
+
+// Pick the open template if there is one, else the nearest movable shape, and
+// move it up the neck; open strings under a shift become barre notes at the
+// shift fret. A slash chord then gets its bass note (see withBass).
 export function chordShape(token) {
   const parsed = parseChord(token);
   if (!parsed) return null;
@@ -105,12 +120,53 @@ export function chordShape(token) {
   let best = null;
   for (const [base, frets] of templates) {
     const shift = (NOTE_INDEX[parsed.root] - NOTE_INDEX[base] + 12) % 12;
-    if (!best || shift < best.shift) best = { shift, frets };
+    const score = shift === 0 || MOVABLE.has(base) ? shift : shift + 12;
+    if (!best || score < best.score) best = { shift, score, frets };
   }
-  const frets = best.frets.map((f) => (f === 'x' ? 'x' : f + best.shift));
+  let frets = best.frets.map((f) => (f === 'x' ? 'x' : f + best.shift));
+  if (parsed.bass && NOTE_INDEX[parsed.bass] !== undefined) frets = withBass(frets, NOTE_INDEX[parsed.bass]);
   const max = Math.max(...frets.filter((f) => f !== 'x'));
   if (max > 15) return null; // unplayably high; better to show nothing
   return frets;
+}
+
+// Put the bass of a slash chord (C/G, D/F#, Am/G) on the lowest string that
+// can take it within the hand's reach (four frets, or an open string): first
+// the low E, then the A string with the low E muted. If neither reaches, the
+// chord is shown without its bass rather than as an unplayable stretch.
+function withBass(frets, bass) {
+  const lowest = frets.findIndex((f) => f !== 'x');
+  if (lowest >= 0 && (OPEN[lowest] + frets[lowest]) % 12 === bass) return frets;
+  const fits = [];
+  for (const string of [0, 1]) {
+    const others = frets.filter((f, i) => i > string && f !== 'x' && f !== 0);
+    const f = (bass - OPEN[string] + 12) % 12;
+    const lo = Math.min(f || Infinity, ...others);
+    const hi = Math.max(f, ...others);
+    if (f !== 0 && hi - lo > 3) continue;
+    const out = frets.slice();
+    out[string] = f;
+    if (string === 1) out[0] = 'x';
+    fits.push({ f, out });
+  }
+  // An open bass string is the easiest to play: D/A is x00232, not 5x0232.
+  const pick = fits.find((c) => c.f === 0) || fits[0];
+  return pick ? pick.out : frets;
+}
+
+// The index finger laid across several strings: the lowest fret used,
+// starting on one of the two bass strings and reaching the high e, with
+// nothing open or muted in between. F (133211), Bb (x13331) and Bm7 (x24232)
+// qualify; A (x02220) and D (xx0232) do not.
+export function barre(frets) {
+  const fretted = frets.filter((f) => f !== 'x' && f !== 0);
+  if (!fretted.length) return null;
+  const fret = Math.min(...fretted);
+  const on = frets.map((f, i) => (f === fret ? i : -1)).filter((i) => i >= 0);
+  if (on.length < 2 || on[0] > 1 || on[on.length - 1] !== 5) return null;
+  const from = on[0];
+  for (let i = from; i <= 5; i++) if (frets[i] === 'x' || frets[i] === 0) return null;
+  return { fret, from, to: 5 };
 }
 
 // 6-string, 5-fret grid as SVG. Shows the nut in first position, otherwise a
@@ -119,7 +175,9 @@ export function diagramSvg(frets) {
   const fretted = frets.filter((f) => f !== 'x' && f !== 0);
   const maxF = fretted.length ? Math.max(...fretted) : 1;
   const minF = fretted.length ? Math.min(...fretted) : 1;
-  const base = maxF <= 5 ? 1 : minF; // first displayed fret
+  // First displayed fret: the nut while the shape fits in the first four
+  // frets, else its lowest fret (Gm7 at 353333 reads from the 3rd).
+  const base = maxF <= 4 ? 1 : minF;
   const X0 = 26, Y0 = 30, SX = 17, SY = 19;
 
   let s = '';
@@ -131,6 +189,11 @@ export function diagramSvg(frets) {
     s += `<line x1="${X0}" y1="${Y0 + j * SY}" x2="${X0 + 5 * SX}" y2="${Y0 + j * SY}" class="cd-line${w}"/>`;
   }
   if (base > 1) s += `<text x="${X0 - 10}" y="${Y0 + SY * 0.65}" class="cd-fr">${base}</text>`;
+  const bar = barre(frets);
+  if (bar) {
+    const y = Y0 + (bar.fret - base) * SY + SY / 2;
+    s += `<rect x="${X0 + bar.from * SX - 6.5}" y="${y - 6.5}" width="${(bar.to - bar.from) * SX + 13}" height="13" rx="6.5" class="cd-dot"/>`;
+  }
   frets.forEach((f, i) => {
     const x = X0 + i * SX;
     if (f === 'x') s += `<text x="${x}" y="${Y0 - 9}" class="cd-mark">×</text>`;

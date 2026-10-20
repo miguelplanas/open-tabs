@@ -131,6 +131,12 @@ test('GET /api/songs answers 200 with a JSON array', async () => {
   assert.ok(Array.isArray(await res.json()));
 });
 
+test('the reader no longer draws the fret rail on its right edge', async () => {
+  const js = await (await fetch(`${base}/js/views/reader.js`)).text();
+  const css = await (await fetch(`${base}/css/app.css`)).text();
+  assert.ok(!js.includes('fret-rail') && !css.includes('.fret-rail'));
+});
+
 test('a created song reads back identically', async () => {
   const payload = {
     title: 'Canción de prueba',

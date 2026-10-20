@@ -1,7 +1,7 @@
 /* Lo propio de OpenTabs. La base común está en base.css (no se edita aquí):
    fuentes, tamaños, colores, espaciado, dos radios, .btn, .field, .list,
    .sheet, .empty. Este fichero pone lo que es de la app: el cuerpo de la tab en monoespaciada, el lector y su dock, y el
-   rasgo propio, las seis cuerdas (.strings) y el riel de trastes (.fret-rail).
+   rasgo propio, las seis cuerdas (.strings).
    Ficha en DESIGN.md. */
 
 :root {
@@ -346,32 +346,6 @@ select.btn, select.btn:hover {
   margin: var(--s3) auto 0;
   max-width: 220px;
   padding-bottom: calc(88px + var(--safe-bottom));
-}
-
-/* Rasgo propio 2: el riel de trastes. Puntos fijos marcan el mástil (trastes
-   3-5-7-9 y la octava hueca en el 12); el punto es "estás aquí". */
-.fret-rail {
-  position: fixed; z-index: 15;
-  top: calc(60px + var(--safe-top));
-  bottom: calc(78px + var(--safe-bottom));
-  right: 7px; width: 12px;
-  pointer-events: none;
-}
-.fret-rail .fd {
-  position: absolute; left: 50%; width: 5px; height: 5px;
-  margin-left: -2.5px; margin-top: -2.5px;
-  border-radius: 50%; background: var(--ink-2); opacity: 0.5;
-}
-.fret-rail .fd-oct {
-  width: 7px; height: 7px; margin-left: -3.5px; margin-top: -3.5px;
-  background: transparent; border: 1px solid var(--ink-2); opacity: 0.6;
-}
-.fret-here {
-  position: absolute; left: 50%; top: 0; width: 9px; height: 9px;
-  margin-left: -4.5px; margin-top: -4.5px;
-  border-radius: 50%; background: var(--ink);
-  box-shadow: 0 0 0 3px var(--wash);
-  transition: top 0.1s linear;
 }
 
 /* Barra de acción a todo el ancho, donde la pantalla acaba en una decisión

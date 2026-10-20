@@ -8,7 +8,7 @@ import {
   groupKey, kindLabel, tuningLabel,
 } from '../ui.js';
 import {
-  enableChordPopovers, hideChordPopover, showChordPopover, chordShape, diagramSvg,
+  enableChordPopovers, hideChordPopover, showChordPopover, chordShape, diagramSvg, shapesFit,
 } from '../chord-shapes.js';
 import { swapSetlistSong } from '../setlist.js';
 import { signed, bracket, transposeLabel } from '../reader-labels.js';
@@ -148,7 +148,11 @@ export async function readerView([id]) {
   if (tuningLabel(song.tuning)) facts.push(`[${tuningLabel(song.tuning)}]`);
   document.getElementById('facts').textContent = facts.join(' ');
   $head.hidden = facts.length === 0 && songChords.length === 0;
-  $strip.hidden = $stripToggle.hidden = songChords.length === 0;
+  $strip.hidden = songChords.length === 0;
+  // In a tuning where standard fingerings do not hold (Drop D, open D) the
+  // strip keeps the names and the diagrams go: a wrong shape is worse than none.
+  const shapes = shapesFit(song.tuning);
+  $stripToggle.hidden = songChords.length === 0 || !shapes;
   let stripOpen = true;
   try { stripOpen = localStorage.getItem('opentabs.chordStrip') !== 'names'; } catch { /* default */ }
 
@@ -158,7 +162,7 @@ export async function readerView([id]) {
     $stripToggle.setAttribute('aria-expanded', String(stripOpen));
     $strip.innerHTML = songChords.map((c) => {
       const name = transposeChord(c, transpose);
-      const frets = stripOpen ? chordShape(name) : null;
+      const frets = stripOpen && shapes ? chordShape(name) : null;
       return `<li><button type="button" class="strip-chord" aria-label="${escapeHtml(name)}, show fingering">` +
         `<span class="chord">${escapeHtml(name)}</span>${frets ? diagramSvg(frets) : ''}</button></li>`;
     }).join('');
@@ -173,7 +177,7 @@ export async function readerView([id]) {
   // Tapping a chord in the strip opens the same, larger fingering popover.
   $strip.addEventListener('click', (e) => {
     const b = e.target.closest('.strip-chord');
-    if (b) showChordPopover(b.querySelector('.chord'));
+    if (b) showChordPopover(b.querySelector('.chord'), { shapes });
   });
 
   // In a setlist, surface "Next: …" once the reader hits the end of the song,
@@ -298,7 +302,7 @@ export async function readerView([id]) {
   render();
   relayout();
   window.addEventListener('resize', relayout);
-  enableChordPopovers($body); // tap a chord to see its fingering
+  enableChordPopovers($body, { shapes }); // tap a chord to see its fingering
 
   // Sibling versions of this song. Filtered from the whole library list rather
   // than fetched with ?q=: the plain /songs url is the one the service worker

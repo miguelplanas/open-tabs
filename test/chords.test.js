@@ -247,6 +247,15 @@ test('wrapStave without bar lines cuts where every string rests, never inside a 
   assert.deepEqual(notes, st[0].slice(2).match(/\d+/g));
 });
 
+test('wrapStave fills the width and leaves the remainder for the last piece', () => {
+  // No bar lines: a 64-column stave on a 43-column screen is one full line
+  // plus the rest, not two half-empty lines.
+  const st = ['e|' + '---0---1--'.repeat(6) + '-', 'B|' + '-'.repeat(61)];
+  const pieces = wrapStave(st, 43);
+  assert.equal(pieces.length, 2);
+  assert.ok(pieces[0][0].length >= 40, `first piece only ${pieces[0][0].length} wide`);
+});
+
 test('wrapStave keeps a repeat count at the end of the last piece', () => {
   const st = ['e|---0---|---2---|  X4', 'B|---1---|---3---|'];
   const pieces = wrapStave(st, 12);

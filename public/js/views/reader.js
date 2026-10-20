@@ -106,14 +106,6 @@ export async function readerView([id]) {
       <span class="setlist-info">${escapeHtml(setlist.name)} <span class="count">${setIdx + 1}/${setlist.ids.length}</span></span>
       <button class="btn icon" id="next" title="Next" aria-label="Next song" ${setIdx === setlist.ids.length - 1 ? 'disabled' : ''}>${icon('chevron-right')}</button>
     </div>` : ''}
-    <div class="fret-rail" aria-hidden="true">
-      <span class="fd" style="top:25%"></span>
-      <span class="fd" style="top:41.7%"></span>
-      <span class="fd" style="top:58.3%"></span>
-      <span class="fd" style="top:75%"></span>
-      <span class="fd fd-oct" style="top:100%"></span>
-      <span class="fret-here" id="progress"></span>
-    </div>
     <section class="song-head" id="head" aria-label="About this song">
       <div class="song-facts">
         <span class="tech" id="facts"></span>
@@ -143,7 +135,6 @@ export async function readerView([id]) {
   const $lvl = document.getElementById('lvl');
   const $remain = document.getElementById('remain');
   const $sub = document.getElementById('sub');
-  const $progress = document.getElementById('progress');
   const $head = document.getElementById('head');
   const $strip = document.getElementById('strip');
   const $stripToggle = document.getElementById('strip-toggle');
@@ -190,7 +181,7 @@ export async function readerView([id]) {
   const $next = document.getElementById('next-song');
 
   // The scroll position at which the song is "done": the last line has reached
-  // just above the dock. Autoscroll and the progress dot both stop here rather
+  // just above the dock. Autoscroll and the "Next" button both go by this rather
   // than at the document bottom, so no blank tail scrolls past.
   let endLimit = Infinity;
 
@@ -198,8 +189,6 @@ export async function readerView([id]) {
     const max = Number.isFinite(endLimit) && endLimit > 0
       ? endLimit
       : Math.max(0, document.body.scrollHeight - window.innerHeight);
-    const y = Math.min(window.scrollY, max);
-    $progress.style.top = (max > 0 ? (100 * y) / max : 0) + '%';
     if ($next) $next.hidden = window.scrollY < max - 40;
   }
   window.addEventListener('scroll', updateProgress, { passive: true });

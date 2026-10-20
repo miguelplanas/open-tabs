@@ -73,6 +73,9 @@ export async function readerView([id]) {
   // always keeps the original monospace layout, shrinking as before.
   let reflowPref = localStorage.getItem('opentabs.reflow') === 'off' ? 'off' : 'auto';
   let reflowing = false;
+  // Characters that fit on one line at the current font: long staves are cut
+  // into pieces this wide (chords.js, wrapStave). Infinity until measured.
+  let staveCols = Infinity;
   let playing = false;
   let wakeLock = null;
   let wakeIdle = null;
@@ -252,7 +255,11 @@ export async function readerView([id]) {
   }
 
   function render() {
-    $body.innerHTML = renderBody(bodyText, transpose, { reflow: reflowing });
+    $body.innerHTML = renderBody(bodyText, transpose, {
+      reflow: reflowing,
+      // "Wrap long lines: Off" keeps every stave whole, scrolling sideways.
+      staveCols: reflowPref === 'off' ? Infinity : staveCols,
+    });
     renderHead();
     syncMeta();
   }
@@ -287,6 +294,14 @@ export async function readerView([id]) {
       render(); // the two layouts are different HTML, not just different CSS
     }
     fitWidth();
+    // The fitted font decides how many characters a stave piece can hold.
+    const cs = getComputedStyle($body);
+    const avail = $body.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+    const cols = Math.floor(avail / charWidth());
+    if (cols > 0 && cols !== staveCols) {
+      staveCols = cols;
+      render();
+    }
     computeEndLimit();
     updateProgress();
   }
@@ -457,6 +472,7 @@ export async function readerView([id]) {
       reflowPref = b.dataset.rf;
       localStorage.setItem('opentabs.reflow', reflowPref);
       syncRf();
+      render();
       relayout();
     };
     el.querySelector('#fs-down').onclick = () => setFont(fontSize - 1);

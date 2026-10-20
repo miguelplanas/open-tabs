@@ -11,6 +11,7 @@ import {
   enableChordPopovers, hideChordPopover, showChordPopover, chordShape, diagramSvg,
 } from '../chord-shapes.js';
 import { swapSetlistSong } from '../setlist.js';
+import { signed, bracket, transposeLabel } from '../reader-labels.js';
 import { speedForDuration, formatRemaining, formatDuration, parseDuration } from '../autoscroll.js';
 
 // Autoscroll speed is persisted per song in pixels/second, but the reader
@@ -90,11 +91,11 @@ export async function readerView([id]) {
 
   $app.innerHTML = `
     <header class="topbar">
-      <button class="btn icon" id="back" title="Back" aria-label="Back">${icon('chevron-left')}</button>
+      <button class="btn quiet icon" id="back" title="Back" aria-label="Back">${icon('chevron-left')}</button>
       <h1>${escapeHtml(song.title)}
         <span class="sub" id="sub"></span>
       </h1>
-      <button class="btn icon" id="tools" title="Song tools" aria-label="Song tools" aria-haspopup="dialog">${icon('ellipsis')}</button>
+      <button class="btn quiet icon" id="tools" title="Song tools" aria-label="Song tools" aria-haspopup="dialog">${icon('ellipsis')}</button>
     </header>
     ${inSetlist ? `
     <div class="setlist-bar">
@@ -264,7 +265,7 @@ export async function readerView([id]) {
     const bits = [song.artist];
     // Which version you are reading only matters when there is more than one.
     if (versions.length > 1) bits.push(kindLabel(song.kind));
-    if (transpose) bits.push(`transpose ${transpose > 0 ? '+' : ''}${transpose}`);
+    if (transpose) bits.push(`transpose ${signed(transpose)}`);
     $sub.textContent = bits.filter(Boolean).join(', ');
 
     $lvl.textContent = String(level);
@@ -272,9 +273,9 @@ export async function readerView([id]) {
       const el = document.getElementById(elId);
       if (el) el.textContent = text;
     };
-    set('tr-val', transpose > 0 ? '+' + transpose : String(transpose));
-    set('fs-val', String(fontSize));
-    set('sp-val', '(level ' + level + ')');
+    set('tr-val', transposeLabel(transpose));
+    set('fs-val', bracket(fontSize));
+    set('sp-val', bracket(level));
     const slider = document.getElementById('sheet-speed');
     if (slider && slider !== document.activeElement) slider.value = String(level);
   }
@@ -388,9 +389,11 @@ export async function readerView([id]) {
           </div>
         </div>
         <div class="tool-row">
-          <span class="tool-label">Wrap long lines</span>
-          <button class="btn${reflowPref === 'auto' ? ' active' : ''}" id="rf-btn"
-                  aria-pressed="${reflowPref === 'auto'}">${reflowPref === 'auto' ? 'Auto' : 'Off'}</button>
+          <span class="tool-label" id="rf-label">Wrap long lines</span>
+          <div class="segments tool-seg" id="rf-seg" role="radiogroup" aria-labelledby="rf-label">
+            <button type="button" class="segment" role="radio" data-rf="auto">Auto</button>
+            <button type="button" class="segment" role="radio" data-rf="off">Off</button>
+          </div>
         </div>
         <div class="tool-row">
           <span class="tool-label">Font size</span>
@@ -401,9 +404,13 @@ export async function readerView([id]) {
           </div>
         </div>
         <div class="tool-row stacked">
-          <span class="tool-label">Autoscroll speed <span class="count" id="sp-val"></span></span>
+          <span class="tool-label">Autoscroll speed <span class="tech muted" id="sp-val"></span></span>
           <input type="range" id="sheet-speed" min="${MIN_LEVEL}" max="${MAX_LEVEL}"
                  step="1" value="${level}" aria-label="Autoscroll speed">
+        </div>
+        <div class="tool-row">
+          <span class="tool-label">Theme</span>
+          <button type="button" class="btn quiet theme-toggle" data-theme-toggle aria-label="Switch light or dark theme"></button>
         </div>
         <div class="tool-row">
           <label class="tool-label" for="sheet-dur">Song length at this speed</label>
@@ -435,13 +442,21 @@ export async function readerView([id]) {
     }
     el.querySelector('#tr-down').onclick = () => setTranspose(transpose - 1);
     el.querySelector('#tr-up').onclick = () => setTranspose(transpose + 1);
-    const $rf = el.querySelector('#rf-btn');
-    $rf.onclick = () => {
-      reflowPref = reflowPref === 'auto' ? 'off' : 'auto';
+    const $rf = el.querySelector('#rf-seg');
+    const syncRf = () => {
+      for (const b of $rf.children) {
+        const on = b.dataset.rf === reflowPref;
+        b.classList.toggle('active', on);
+        b.setAttribute('aria-checked', String(on));
+      }
+    };
+    syncRf();
+    $rf.onclick = (e) => {
+      const b = e.target.closest('[data-rf]');
+      if (!b || b.dataset.rf === reflowPref) return;
+      reflowPref = b.dataset.rf;
       localStorage.setItem('opentabs.reflow', reflowPref);
-      $rf.classList.toggle('active', reflowPref === 'auto');
-      $rf.setAttribute('aria-pressed', String(reflowPref === 'auto'));
-      $rf.textContent = reflowPref === 'auto' ? 'Auto' : 'Off';
+      syncRf();
       relayout();
     };
     el.querySelector('#fs-down').onclick = () => setFont(fontSize - 1);

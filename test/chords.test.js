@@ -5,7 +5,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  isChordToken, isChordLine, isTabLine, parseChord, transposeChord, renderBody,
+  isChordToken, isChordLine, isTabLine, parseChord, transposeChord, renderBody, wrapStave,
   fitChars, detectKind, pageStep, pageKeyDirection, uniqueChords,
 } from '../public/js/chords.js';
 
@@ -205,7 +205,60 @@ test('reflow leaves staves and section headers alone', () => {
   // or every gap in the song doubles. Newlines inside a stave are the point of
   // the stave, so they stay.
   assert.ok(!/<\/span>\n<span class="row/.test(out));
-  assert.match(out, /tabline">e\|--0--2--\|<\/span>\n<span class="tabline"/);
+  assert.match(out, /tabline">e\|--<span class="fret">0<\/span>--<span class="fret">2<\/span>--\|<\/span>\n<span class="tabline"/);
+});
+
+test('a repeat count after a stave line does not end the stave', () => {
+  assert.ok(isTabLine('D|----------|  X4'));
+  assert.ok(isTabLine('e|--0--|  (x2)'));
+  const out = renderBody('e|--0--|\nB|--1--|  X4\nG|--0--|');
+  assert.equal(out.match(/class="tabblock"/g).length, 1);
+});
+
+test('stave lines pick out their fret numbers', () => {
+  const out = renderBody('e|--0--12--|');
+  assert.match(out, /<span class="fret">0<\/span>--<span class="fret">12<\/span>/);
+});
+
+test('wrapStave leaves a stave that fits alone', () => {
+  const st = ['e|--0--|', 'B|--1--|'];
+  assert.deepEqual(wrapStave(st, 40), [st]);
+  assert.deepEqual(wrapStave(st, Infinity), [st]);
+});
+
+test('wrapStave cuts a long stave at bar lines and repeats the string names', () => {
+  const st = ['e|---0---|---2---|---3---|', 'B|---1---|---3---|-------|', 'G|-------|-12----|---0---|'];
+  assert.deepEqual(wrapStave(st, 20), [
+    ['e|---0---|---2---|', 'B|---1---|---3---|', 'G|-------|-12----|'],
+    ['e|---3---|', 'B|-------|', 'G|---0---|'],
+  ]);
+});
+
+test('wrapStave without bar lines cuts where every string rests, never inside a fret', () => {
+  const st = ['e|' + '--3--12---'.repeat(8), 'B|' + '-'.repeat(80)];
+  const pieces = wrapStave(st, 30);
+  assert.ok(pieces.length > 1);
+  for (const piece of pieces) {
+    assert.ok(piece.every((l) => l.length <= 30));
+    assert.ok(piece[0].startsWith('e|') && piece[1].startsWith('B|'));
+  }
+  // Rejoining the pieces gives back every note, none split in two.
+  const notes = pieces.map((p) => p[0].slice(2)).join('').match(/\d+/g);
+  assert.deepEqual(notes, st[0].slice(2).match(/\d+/g));
+});
+
+test('wrapStave keeps a repeat count at the end of the last piece', () => {
+  const st = ['e|---0---|---2---|  X4', 'B|---1---|---3---|'];
+  const pieces = wrapStave(st, 12);
+  assert.equal(pieces.length, 2);
+  assert.equal(pieces[1][0], 'e|---2---|  X4');
+});
+
+test('renderBody cuts long staves into separate blocks when given a width', () => {
+  const st = ['e|---0---|---2---|---3---|', 'B|---1---|---3---|-------|'].join('\n');
+  assert.equal(renderBody(st, 0, { staveCols: 20 }).match(/class="tabblock"/g).length, 2);
+  assert.equal(renderBody(st, 0, { staveCols: 20, reflow: true }).match(/class="tabblock"/g).length, 2);
+  assert.equal(renderBody(st).match(/class="tabblock"/g).length, 1);
 });
 
 test('renderBody without reflow is unchanged', () => {

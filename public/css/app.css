@@ -337,6 +337,9 @@ select.btn, select.btn:hover {
 .tabbody .row.section { display: flex; }
 .tabbody .section::after { content: ''; flex: 1; height: 1px; background: var(--line); }
 .tabbody .tabline { color: var(--tabline); }
+/* Los trastes son lo que se busca en un pentagrama: en tinta y 500, y los
+   guiones de alrededor se quedan en gris. */
+.tabbody .tabline .fret { color: var(--ink); font-weight: 500; }
 
 /* Fin de canción: lo justo para que la última línea libre el dock. */
 .songend {

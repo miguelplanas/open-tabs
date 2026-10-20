@@ -47,8 +47,78 @@ export function isChordLine(line) {
 
 // ASCII tablature lines (e|--0--2--) are neither lyrics nor chords.
 export function isTabLine(line) {
-  return /^[eEbBgGdDaA]?\|?[-0-9hpbrx/\\~|() ]*-{2,}[-0-9hpbrx/\\~|() ]*\|?\s*$/.test(line) &&
+  return /^[eEbBgGdDaA]?\|?[-0-9hpbrxX/\\~|() ]*-{2,}[-0-9hpbrxX/\\~|() ]*\|?\s*$/.test(stripRepeat(line)) &&
     line.includes('-');
+}
+
+// A repeat count written after a stave line ("|  X4", "| (x2)"). It belongs to
+// the stave, so it must not end it.
+const REPEAT_TAIL_RE = /(\|)\s+\(?[xX]\s?\d+\)?\s*$/;
+const stripRepeat = (line) => line.replace(REPEAT_TAIL_RE, '$1');
+
+// --- Stave wrapping ------------------------------------------------------
+// A stave only reads with its strings aligned, so it used to scroll sideways
+// as one block, cut off at the screen edge. With a guitar in your hands you
+// cannot drag every stave across. wrapStave cuts it into pieces that fit, the
+// way printed tablature runs on in systems: at a bar line when there is one
+// in reach, otherwise at a column where every string rests ("-"), so a fret
+// number is never split. Each piece repeats the string names.
+
+// The "e|" a stave line starts with, kept on every piece.
+const STRING_PREFIX_RE = /^\s*[A-Ga-g]?[#b]?\|/;
+
+export function wrapStave(lines, cols) {
+  const parts = lines.map((l) => {
+    const m = stripRepeat(l.replace(/\s+$/, '')).match(STRING_PREFIX_RE);
+    const prefix = m ? m[0] : '';
+    return { prefix, body: stripRepeat(l.replace(/\s+$/, '')).slice(prefix.length) };
+  });
+  const prefixW = Math.max(...parts.map((p) => p.prefix.length));
+  const len = Math.max(...parts.map((p) => p.body.length));
+  const width = cols - prefixW;
+  if (!Number.isFinite(cols) || len <= width || width < 8) return [lines];
+
+  const at = (c) => parts.map((p) => p.body[c] ?? ' ');
+  const isBar = (c) => at(c).every((ch) => ch === '|');
+  const isRest = (c) => at(c).every((ch) => ch === '-' || ch === ' ');
+  const pieces = [];
+  let start = 0;
+  while (start < len) {
+    let end = Math.min(len, start + width); // exclusive
+    if (end < len) {
+      // Aim for pieces of even length rather than full ones and a stub: a
+      // 70-column stave on a 60-column screen reads better as 35 + 35.
+      const rest = len - start;
+      const target = start + Math.ceil(rest / Math.ceil(rest / width));
+      const best = (ok, shift) => {
+        let cut = -1;
+        for (let c = Math.ceil(start + width / 3); c < end; c++) {
+          if (ok(c) && (cut < 0 || Math.abs(c + shift - target) <= Math.abs(cut - target))) cut = c + shift;
+        }
+        return cut;
+      };
+      // A bar line closes its piece (it stays on it); failing that, a column
+      // where every string rests, so no fret number is split in two.
+      let cut = best(isBar, 1);
+      if (cut < 0) cut = best(isRest, 0);
+      if (cut > start) end = cut;
+    }
+    pieces.push(parts.map((p) => p.prefix.padEnd(prefixW) + p.body.slice(start, end)));
+    start = end;
+  }
+  // Repeat counts go at the end of the last piece, where they were written.
+  const tails = lines.map((l) => (l.match(REPEAT_TAIL_RE) || [''])[0].slice(1));
+  const last = pieces[pieces.length - 1];
+  tails.forEach((t, i) => { if (t) last[i] += t; });
+  return pieces;
+}
+
+// One stave line with its fret numbers picked out: at the distance of the
+// music stand the notes are what you look for, not the dashes around them.
+function tabLineHtml(line) {
+  const tail = (line.match(REPEAT_TAIL_RE) || [''])[0].slice(1); // "  X4" is not a fret
+  const stave = tail ? line.slice(0, line.length - tail.length) : line;
+  return escapeHtml(stave).replace(/\d+/g, (n) => `<span class="fret">${n}</span>`) + escapeHtml(tail);
 }
 
 export function transposeChord(chord, semitones) {
@@ -197,7 +267,7 @@ function pairHtml(chordLine, lyricLine, semitones) {
 // With `reflow`, chord and lyric lines are paired and wrapped (see above) so
 // nothing needs a smaller font to fit; staves keep their own scroll either way,
 // since tablature cannot be reflowed without destroying it.
-export function renderBody(body, semitones = 0, { reflow = false } = {}) {
+export function renderBody(body, semitones = 0, { reflow = false, staveCols = Infinity } = {}) {
   const out = [];
   const lines = body.split('\n');
   let stave = [];
@@ -207,13 +277,16 @@ export function renderBody(body, semitones = 0, { reflow = false } = {}) {
   const row = (html) => (reflow ? `<span class="row">${html}</span>` : html);
   const flushStave = () => {
     if (stave.length === 0) return;
-    out.push(row(`<span class="tabblock">${stave.join('\n')}</span>`));
+    const pieces = wrapStave(stave, staveCols).map((piece) =>
+      row(`<span class="tabblock">${piece.map((l) => `<span class="tabline">${tabLineHtml(l)}</span>`).join('\n')}</span>`));
+    // Pieces of one stave are separated by a blank line, like systems on paper.
+    out.push(pieces.join(reflow ? '<span class="row"></span>' : '\n\n'));
     stave = [];
   };
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     if (isTabLine(line)) {
-      stave.push(`<span class="tabline">${escapeHtml(line)}</span>`);
+      stave.push(line);
       continue;
     }
     flushStave();

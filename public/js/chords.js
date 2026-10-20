@@ -86,21 +86,15 @@ export function wrapStave(lines, cols) {
   while (start < len) {
     let end = Math.min(len, start + width); // exclusive
     if (end < len) {
-      // Aim for pieces of even length rather than full ones and a stub: a
-      // 70-column stave on a 60-column screen reads better as 35 + 35.
-      const rest = len - start;
-      const target = start + Math.ceil(rest / Math.ceil(rest / width));
-      const best = (ok, shift) => {
-        let cut = -1;
-        for (let c = Math.ceil(start + width / 3); c < end; c++) {
-          if (ok(c) && (cut < 0 || Math.abs(c + shift - target) <= Math.abs(cut - target))) cut = c + shift;
-        }
-        return cut;
-      };
-      // A bar line closes its piece (it stays on it); failing that, a column
-      // where every string rests, so no fret number is split in two.
-      let cut = best(isBar, 1);
-      if (cut < 0) cut = best(isRest, 0);
+      // Fill the screen: every piece runs as far as it can and only the last
+      // one is shorter, as on printed tab. The cut is the last bar line in
+      // reach (it stays on this piece); failing that, the last column where
+      // every string rests, so no fret number is split in two. Neither is
+      // looked for in the first half, which would waste the line.
+      const floor = start + width / 2;
+      let cut = -1;
+      for (let c = end - 1; c >= floor && cut < 0; c--) if (isBar(c)) cut = c + 1;
+      for (let c = end; c >= floor && cut < 0; c--) if (isRest(c)) cut = c;
       if (cut > start) end = cut;
     }
     pieces.push(parts.map((p) => p.prefix.padEnd(prefixW) + p.body.slice(start, end)));

@@ -323,8 +323,21 @@ export function diagramSvg(frets) {
   return `<svg viewBox="0 0 137 132" width="137" height="132" aria-hidden="true">${s}</svg>`;
 }
 
-// Singleton popover anchored to a tapped .chord span. Any tap outside,
-// Escape, or scrolling dismisses it.
+// Where the popover goes for a chord at viewport rect `r`: below it if it
+// fits, else above, clamped to the viewport. `side` keeps the side picked when
+// it opened, so the popover does not flip while the song scrolls under it.
+// Null once the chord has scrolled out of view.
+export function placePopover(r, pw, ph, vw, vh, side) {
+  if (r.bottom < 0 || r.top > vh) return null;
+  if (!side) side = r.bottom + 8 + ph > vh - 8 ? 'above' : 'below';
+  const x = Math.min(Math.max(8, r.left + r.width / 2 - pw / 2), vw - pw - 8);
+  const y = side === 'below' ? r.bottom + 8 : r.top - ph - 8;
+  return { x, y: Math.max(8, y), side };
+}
+
+// Singleton popover anchored to a tapped .chord span. It follows the chord
+// while the page scrolls (autoscroll keeps moving while you look at it) and
+// closes on any tap, Escape, or once the chord leaves the screen.
 let pop = null;
 let dismiss = null;
 
@@ -343,14 +356,18 @@ export function showChordPopover(chordEl, { shapes = true } = {}) {
     frets ? diagramSvg(frets) : `<div class="cd-none">${shapes ? 'no diagram' : 'not for this tuning'}</div>`}`;
   document.body.append(pop);
 
-  // Below the chord if it fits, else above; clamped to the viewport.
-  const r = chordEl.getBoundingClientRect();
-  const pw = pop.offsetWidth, ph = pop.offsetHeight;
-  let x = Math.min(Math.max(8, r.left + r.width / 2 - pw / 2), window.innerWidth - pw - 8);
-  let y = r.bottom + 8;
-  if (y + ph > window.innerHeight - 8) y = r.top - ph - 8;
-  pop.style.left = x + 'px';
-  pop.style.top = Math.max(8, y) + 'px';
+  let side;
+  let frame = 0;
+  const place = () => {
+    frame = 0;
+    const at = placePopover(chordEl.getBoundingClientRect(), pop.offsetWidth, pop.offsetHeight,
+      window.innerWidth, window.innerHeight, side);
+    if (!at) return dismiss();
+    side = at.side;
+    pop.style.left = at.x + 'px';
+    pop.style.top = at.y + 'px';
+  };
+  const onScroll = () => { if (!frame) frame = requestAnimationFrame(place); };
 
   // Any tap dismisses, popover included: it is removed on pointerdown, so a
   // tap "through" it still clicks the chord underneath and reopens there.
@@ -359,14 +376,16 @@ export function showChordPopover(chordEl, { shapes = true } = {}) {
   dismiss = () => {
     document.removeEventListener('pointerdown', onDown, true);
     document.removeEventListener('keydown', onKey);
-    window.removeEventListener('scroll', dismiss);
+    window.removeEventListener('scroll', onScroll);
+    cancelAnimationFrame(frame);
     pop.remove();
     pop = null;
     dismiss = null;
   };
   document.addEventListener('pointerdown', onDown, true);
   document.addEventListener('keydown', onKey);
-  window.addEventListener('scroll', dismiss, { passive: true, once: true });
+  window.addEventListener('scroll', onScroll, { passive: true });
+  place();
 }
 
 // Convenience: delegate chord taps inside a rendered tab body.

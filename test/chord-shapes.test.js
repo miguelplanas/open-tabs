@@ -4,7 +4,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  chordShape, barre, diagramSvg, canonicalQuality, shapesFit, TEMPLATES,
+  chordShape, barre, diagramSvg, canonicalQuality, shapesFit, TEMPLATES, placePopover,
 } from '../public/js/chord-shapes.js';
 
 test('open chords resolve to their canonical shapes', () => {
@@ -194,4 +194,28 @@ test('a shape above the 4th fret is drawn from its lowest fret', () => {
 test('unknown roots or qualities yield no diagram', () => {
   assert.equal(chordShape('X7'), null);
   assert.equal(chordShape('Hello'), null);
+});
+
+// The chord popover follows its chord while autoscroll moves the page,
+// instead of closing on the first scroll event.
+test('placePopover keeps following the chord as it scrolls', () => {
+  const rect = (top) => ({ top, bottom: top + 20, left: 100, width: 20 });
+  const first = placePopover(rect(300), 160, 170, 400, 800);
+  assert.deepEqual(first, { x: 30, y: 328, side: 'below' });
+  const later = placePopover(rect(200), 160, 170, 400, 800, first.side);
+  assert.deepEqual(later, { x: 30, y: 228, side: 'below' });
+});
+
+test('placePopover opens above near the bottom and does not flip while scrolling', () => {
+  const rect = (top) => ({ top, bottom: top + 20, left: 100, width: 20 });
+  const first = placePopover(rect(700), 160, 170, 400, 800);
+  assert.equal(first.side, 'above');
+  assert.equal(first.y, 700 - 170 - 8);
+  // Scrolled up to where "below" would fit: it stays above.
+  assert.equal(placePopover(rect(400), 160, 170, 400, 800, first.side).side, 'above');
+});
+
+test('placePopover gives up once the chord is off screen', () => {
+  assert.equal(placePopover({ top: -40, bottom: -20, left: 0, width: 20 }, 160, 170, 400, 800, 'below'), null);
+  assert.equal(placePopover({ top: 820, bottom: 840, left: 0, width: 20 }, 160, 170, 400, 800, 'below'), null);
 });

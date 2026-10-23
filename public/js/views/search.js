@@ -3,9 +3,11 @@ import { icon } from '../icons.js';
 import { toast } from '../ui.js';
 import { addRecent, loadRecent, saveRecent, parseLink } from '../search-history.js';
 import { queryFromSearchParams } from '../search-route.js';
+import { loadJson, saveJson } from '../view-state.js';
 
-// Remembers the last online search for the session, so after importing one
-// version the user can come back and grab another without retyping.
+// Remembers the last online search for the session (query, results, the type
+// filter and which songs were expanded), so after importing one version the
+// user comes back to the same list, at the same place, without a new request.
 const STATE_KEY = 'opentabs.searchState';
 const OFFLINE = 'You are offline. Online search needs a connection.';
 
@@ -65,6 +67,12 @@ export async function searchView([params] = []) {
   let activeType = null;
   let openKeys = new Set(); // groups the user has expanded
 
+  function saveState() {
+    saveJson(sessionStorage, STATE_KEY, {
+      source: $source.value, q: $q.value.trim(), rows: lastRows, activeType, open: [...openKeys],
+    });
+  }
+
   // One group per song + artist, preserving the provider's relevance order.
   // Versions inside a group are sorted by votes (most trusted first), like UG.
   function groupRows(rows) {
@@ -93,7 +101,7 @@ export async function searchView([params] = []) {
     $types.innerHTML = '';
     for (const t of types) {
       const chip = h(`<button class="chip${t === activeType ? ' active' : ''}" type="button">${escapeHtml(t)}</button>`);
-      chip.onclick = () => { activeType = activeType === t ? null : t; renderResults(); };
+      chip.onclick = () => { activeType = activeType === t ? null : t; saveState(); renderResults(); };
       $types.append(chip);
     }
 
@@ -129,6 +137,7 @@ export async function searchView([params] = []) {
     head.onclick = () => {
       if (openKeys.has(g.key)) openKeys.delete(g.key);
       else openKeys.add(g.key);
+      saveState();
       li.replaceWith(groupItem(g));
     };
     return li;
@@ -185,7 +194,7 @@ export async function searchView([params] = []) {
       lastRows = rows;
       activeType = null;
       openKeys = new Set();
-      sessionStorage.setItem(STATE_KEY, JSON.stringify({ source: $source.value, q }));
+      saveState();
       saveRecent(localStorage, addRecent(loadRecent(localStorage), q));
       renderResults();
     } catch (err) {
@@ -272,18 +281,30 @@ export async function searchView([params] = []) {
     $q.value = handed;
     search();
   } else {
-    // Restore the previous search of this session, if any.
-    try {
-      const prev = JSON.parse(sessionStorage.getItem(STATE_KEY));
-      if (prev?.q && sourcesList.some((s) => s.name === prev.source)) {
-        $source.value = prev.source;
-        $q.value = prev.q;
+    // Restore the previous search of this session, if any. Its results come
+    // back from storage rather than the network, so they are on screen before
+    // the view returns and the router can scroll back to where you were.
+    const prev = loadJson(sessionStorage, STATE_KEY);
+    if (prev?.q && sourcesList.some((s) => s.name === prev.source)) {
+      $source.value = prev.source;
+      $q.value = prev.q;
+      if (Array.isArray(prev.rows)) {
+        lastRows = prev.rows;
+        activeType = prev.activeType ?? null;
+        openKeys = new Set(prev.open || []);
+        $start.hidden = true;
+        renderResults();
+      } else {
         search();
       }
-    } catch { /* start blank */ }
+    }
   }
-  if (!$q.value) showStart();
-  $q.focus();
+  // Only a blank search takes the keyboard: on the way back to a result list
+  // it would cover it and scroll the page.
+  if (!$q.value) {
+    showStart();
+    $q.focus();
+  }
 
   return () => debouncedSearch.cancel();
 }

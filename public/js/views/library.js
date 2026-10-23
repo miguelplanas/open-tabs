@@ -8,6 +8,7 @@ import {
   ORDERS, readOrder, sectionsByLetter, sectionsByArtist, letterAt, nearestPresent,
   compactLetters,
 } from '../library-order.js';
+import { loadJson, saveJson, LIBRARY_QUERY_KEY } from '../view-state.js';
 
 // Same key as before the three-way order; readOrder() migrates what is there.
 const PREFS_KEY = 'opentabs.libraryPrefs';
@@ -41,6 +42,10 @@ export async function libraryView() {
   const $az = document.getElementById('az');
   const $bubble = document.getElementById('az-bubble');
   const $strip = document.getElementById('az-strip');
+
+  // The filter survives opening a song: coming back shows the same filtered
+  // list, and the router puts the scroll back where it was on top of it.
+  $q.value = loadJson(sessionStorage, LIBRARY_QUERY_KEY) || '';
 
   // Restore the order the owner last used.
   let prefs = null;
@@ -209,7 +214,10 @@ export async function libraryView() {
   }
 
   const debouncedLoad = debounce(load, 200);
-  $q.addEventListener('input', debouncedLoad);
+  $q.addEventListener('input', () => {
+    saveJson(sessionStorage, LIBRARY_QUERY_KEY, $q.value.trim());
+    debouncedLoad();
+  });
   $order.onclick = (e) => {
     const b = e.target.closest('.segment');
     if (!b || b.dataset.order === order) return;

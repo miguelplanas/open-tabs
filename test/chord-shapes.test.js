@@ -4,7 +4,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  chordShape, barre, diagramSvg, canonicalQuality, shapesFit, TEMPLATES, placePopover,
+  chordShape, barre, diagramSvg, canonicalQuality, shapesFit, TEMPLATES, placePopover, chordInView,
 } from '../public/js/chord-shapes.js';
 
 test('open chords resolve to their canonical shapes', () => {
@@ -196,26 +196,25 @@ test('unknown roots or qualities yield no diagram', () => {
   assert.equal(chordShape('Hello'), null);
 });
 
-// The chord popover follows its chord while autoscroll moves the page,
-// instead of closing on the first scroll event.
-test('placePopover keeps following the chord as it scrolls', () => {
-  const rect = (top) => ({ top, bottom: top + 20, left: 100, width: 20 });
-  const first = placePopover(rect(300), 160, 170, 400, 800);
-  assert.deepEqual(first, { x: 30, y: 328, side: 'below' });
-  const later = placePopover(rect(200), 160, 170, 400, 800, first.side);
-  assert.deepEqual(later, { x: 30, y: 228, side: 'below' });
+// The chord popover opens above the chord name, so the lines still to come
+// stay readable while autoscroll runs.
+const chordAt = (top) => ({ top, bottom: top + 20, left: 100, width: 20 });
+
+test('placePopover opens above the chord when it fits under the top bar', () => {
+  assert.deepEqual(placePopover(chordAt(400), 160, 170, 400, 100), { x: 30, y: 222, side: 'above' });
 });
 
-test('placePopover opens above near the bottom and does not flip while scrolling', () => {
-  const rect = (top) => ({ top, bottom: top + 20, left: 100, width: 20 });
-  const first = placePopover(rect(700), 160, 170, 400, 800);
-  assert.equal(first.side, 'above');
-  assert.equal(first.y, 700 - 170 - 8);
-  // Scrolled up to where "below" would fit: it stays above.
-  assert.equal(placePopover(rect(400), 160, 170, 400, 800, first.side).side, 'above');
+test('placePopover falls back to below when the top bar is in the way', () => {
+  assert.deepEqual(placePopover(chordAt(200), 160, 170, 400, 100), { x: 30, y: 228, side: 'below' });
 });
 
-test('placePopover gives up once the chord is off screen', () => {
-  assert.equal(placePopover({ top: -40, bottom: -20, left: 0, width: 20 }, 160, 170, 400, 800, 'below'), null);
-  assert.equal(placePopover({ top: 820, bottom: 840, left: 0, width: 20 }, 160, 170, 400, 800, 'below'), null);
+test('placePopover keeps the diagram inside the screen sideways', () => {
+  assert.equal(placePopover({ top: 400, bottom: 420, left: 0, width: 20 }, 160, 170, 400, 100).x, 8);
+  assert.equal(placePopover({ top: 400, bottom: 420, left: 390, width: 20 }, 160, 170, 400, 100).x, 232);
+});
+
+test('chordInView is false once the chord is under the top bar or below the screen', () => {
+  assert.equal(chordInView(chordAt(400), 100, 800), true);
+  assert.equal(chordInView(chordAt(70), 100, 800), false);
+  assert.equal(chordInView(chordAt(810), 100, 800), false);
 });

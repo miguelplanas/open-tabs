@@ -520,6 +520,9 @@ label.f > * { margin-top: var(--s1); color: var(--ink); }
   background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-control);
   box-shadow: var(--shadow); padding: var(--s2) var(--s3) var(--s1); text-align: center;
 }
+/* Un acorde de la letra: el diagrama va en coordenadas de página y se mueve
+   con el texto al hacer scroll, sin recolocarlo por JS. */
+.chord-pop.in-page { position: absolute; }
 .chord-pop svg { margin-inline: auto; }
 .chord-pop .cd-name { font-family: var(--mono); font-weight: 500; color: var(--chord); font-size: 15px; }
 .chord-pop .cd-none { color: var(--ink-2); font-size: 13px; padding: var(--s3) var(--s2); }

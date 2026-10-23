@@ -323,21 +323,39 @@ export function diagramSvg(frets) {
   return `<svg viewBox="0 0 137 132" width="137" height="132" aria-hidden="true">${s}</svg>`;
 }
 
-// Where the popover goes for a chord at viewport rect `r`: below it if it
-// fits, else above, clamped to the viewport. `side` keeps the side picked when
-// it opened, so the popover does not flip while the song scrolls under it.
-// Null once the chord has scrolled out of view.
-export function placePopover(r, pw, ph, vw, vh, side) {
-  if (r.bottom < 0 || r.top > vh) return null;
-  if (!side) side = r.bottom + 8 + ph > vh - 8 ? 'above' : 'below';
+// Where the popover goes for a chord at viewport rect `r`, in viewport
+// coordinates: above the chord name, so it never covers the lines still to
+// come, unless it would not fit under `top` (the bottom of the top bar); then
+// below. Clamped sideways to the viewport.
+export function placePopover(r, pw, ph, vw, top = 8) {
+  const side = r.top - ph - 8 >= top ? 'above' : 'below';
   const x = Math.min(Math.max(8, r.left + r.width / 2 - pw / 2), vw - pw - 8);
-  const y = side === 'below' ? r.bottom + 8 : r.top - ph - 8;
-  return { x, y: Math.max(8, y), side };
+  const y = side === 'above' ? r.top - ph - 8 : r.bottom + 8;
+  return { x, y, side };
 }
 
-// Singleton popover anchored to a tapped .chord span. It follows the chord
-// while the page scrolls (autoscroll keeps moving while you look at it) and
-// closes on any tap, Escape, or once the chord leaves the screen.
+// Whether a chord at viewport rect `r` is still visible between the top bar
+// (`top`) and the bottom of the screen.
+export function chordInView(r, top, vh) {
+  return r.bottom > top && r.top < vh;
+}
+
+// Does el sit in something pinned to the screen (the sticky top bar with the
+// chord strip)? Then the popover is pinned too; otherwise it scrolls with the
+// page.
+function pinned(el) {
+  for (let n = el; n && n !== document.body; n = n.parentElement) {
+    const p = getComputedStyle(n).position;
+    if (p === 'fixed' || p === 'sticky') return true;
+  }
+  return false;
+}
+
+// Singleton popover anchored to a tapped .chord span. A chord in the song is
+// positioned in page coordinates, so the popover rides along with the text
+// while autoscroll runs (the browser moves both together, no JS per frame, so
+// it does not judder), and it closes on any tap, Escape, or once the chord
+// leaves the screen.
 let pop = null;
 let dismiss = null;
 
@@ -356,18 +374,22 @@ export function showChordPopover(chordEl, { shapes = true } = {}) {
     frets ? diagramSvg(frets) : `<div class="cd-none">${shapes ? 'no diagram' : 'not for this tuning'}</div>`}`;
   document.body.append(pop);
 
-  let side;
+  const bar = document.querySelector('.topbar');
+  const top = (bar ? bar.getBoundingClientRect().bottom : 0) + 8;
+  const fixed = pinned(chordEl);
+  const at = placePopover(chordEl.getBoundingClientRect(), pop.offsetWidth, pop.offsetHeight,
+    window.innerWidth, top);
+  if (!fixed) pop.classList.add('in-page');
+  pop.style.left = at.x + (fixed ? 0 : window.scrollX) + 'px';
+  pop.style.top = at.y + (fixed ? 0 : window.scrollY) + 'px';
+
+  // Scrolling only reads: once the chord has gone, so does its diagram.
   let frame = 0;
-  const place = () => {
+  const check = () => {
     frame = 0;
-    const at = placePopover(chordEl.getBoundingClientRect(), pop.offsetWidth, pop.offsetHeight,
-      window.innerWidth, window.innerHeight, side);
-    if (!at) return dismiss();
-    side = at.side;
-    pop.style.left = at.x + 'px';
-    pop.style.top = at.y + 'px';
+    if (!chordInView(chordEl.getBoundingClientRect(), top - 8, window.innerHeight)) dismiss();
   };
-  const onScroll = () => { if (!frame) frame = requestAnimationFrame(place); };
+  const onScroll = () => { if (!frame) frame = requestAnimationFrame(check); };
 
   // Any tap dismisses, popover included: it is removed on pointerdown, so a
   // tap "through" it still clicks the chord underneath and reopens there.
@@ -384,8 +406,7 @@ export function showChordPopover(chordEl, { shapes = true } = {}) {
   };
   document.addEventListener('pointerdown', onDown, true);
   document.addEventListener('keydown', onKey);
-  window.addEventListener('scroll', onScroll, { passive: true });
-  place();
+  if (!fixed) window.addEventListener('scroll', onScroll, { passive: true });
 }
 
 // Convenience: delegate chord taps inside a rendered tab body.

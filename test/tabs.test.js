@@ -46,3 +46,11 @@ test('the tab bar has an opaque background so list rows do not show through', ()
   assert.match(rule, /background:\s*var\(--bg\)/);
   assert.doesNotMatch(rule, /--glass|backdrop-filter/);
 });
+
+test('the top bar clears the iOS blur under the status bar', () => {
+  // iOS 26+ blurs the top of the screen below the status bar; a header that
+  // starts right at the safe area has its title and buttons half blurred.
+  const css = readFileSync(new URL('../public/css/app.css', import.meta.url), 'utf8');
+  const rule = css.match(/\n\.topbar \{([^}]*)\}/)[1];
+  assert.match(rule, /padding:\s*calc\(var\(--s2\) \+ var\(--safe-top\) \+ min\(var\(--safe-top\), var\(--s3\)\)\)/);
+});

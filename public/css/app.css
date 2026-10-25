@@ -55,7 +55,10 @@ code { font-family: var(--mono); font-size: 0.9em; }
 .topbar {
   position: sticky; top: 0; z-index: 10;
   display: flex; align-items: center; gap: var(--s2); flex-wrap: wrap;
-  padding: calc(var(--s2) + var(--safe-top)) var(--s4) var(--s2);
+  /* El margen de más bajo la barra de estado (solo si la hay) saca el
+     título y los botones del difuminado que iOS 26+ pone en lo alto de la
+     pantalla: pegados a la barra quedaban medio borrosos. */
+  padding: calc(var(--s2) + var(--safe-top) + min(var(--safe-top), var(--s3))) var(--s4) var(--s2);
   background: var(--glass);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);

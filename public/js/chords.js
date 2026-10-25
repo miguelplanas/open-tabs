@@ -335,21 +335,49 @@ export function uniqueChords(body) {
   return out;
 }
 
-// Width, in characters, that the reader should size its font to fit.
+// Width, in characters, that the reader should size its font to fit: the
+// widest line that is not tablature (staves are cut to the screen on their
+// own, see wrapStave).
 //
-// The widest line is the wrong target: one malformed 200-char import (or a
-// stave, which scrolls on its own) would shrink every lyric in the song. So
-// tab lines are ignored and a high percentile of what is left is used, letting
-// the rare outlier scroll sideways while everything you actually read stays
-// at a comfortable size.
-export function fitChars(body, percentile = 0.95) {
-  const widths = body
-    .split('\n')
-    .filter((l) => l.trim() !== '' && !isTabLine(l))
-    .map((l) => l.replace(/\s+$/, '').length)
-    .sort((a, b) => a - b);
-  if (widths.length === 0) return 0;
-  return widths[Math.min(widths.length - 1, Math.floor(widths.length * percentile))];
+// It used to be a high percentile, to let one over-long line scroll sideways
+// instead of shrinking the song. On a phone that meant the whole song dragged
+// sideways, which is worse than either alternative: now a line that cannot fit
+// at a readable size sends the song to reflow, where every line wraps.
+export function fitChars(body) {
+  let widest = 0;
+  for (const l of body.split('\n')) {
+    if (l.trim() === '' || isTabLine(l)) continue;
+    widest = Math.max(widest, l.replace(/\s+$/, '').length);
+  }
+  return widest;
+}
+
+// How the reader lays a song out: plain (the original monospace columns) or
+// reflowed (chords bound to their words, wrapping), and at what font size.
+//
+//   chosen     the size the user asked for (A- / A+, remembered across songs)
+//   fitted     the largest size at which the plain layout fits the width
+//              (chosen itself when it already fits)
+//   sizedByUser  whether A- / A+ was touched in this song
+//
+// Untouched, a song that is too wide is shrunk to fit, down to minFit, and
+// past that it reflows. Once the user picks a size, that size is the one on
+// screen: a plain song that no longer fits at it wraps instead of being shrunk
+// back, which used to make A+ do nothing at all on any fitted song.
+export function readerLayout({ chosen, fitted, sizedByUser = false, reflowPref = 'auto', minFit = 11 }) {
+  if (reflowPref === 'off') {
+    return { reflow: false, font: sizedByUser ? chosen : Math.max(minFit, Math.min(chosen, fitted)) };
+  }
+  if (fitted >= chosen) return { reflow: false, font: chosen };
+  if (!sizedByUser && fitted >= minFit) return { reflow: false, font: fitted };
+  return { reflow: true, font: chosen };
+}
+
+// The size A- / A+ steps from. The first tap in a song starts at what is on
+// screen, rounded the way the sheet shows it, not at the remembered size the
+// song was shrunk from: otherwise the readout jumps and the text does not.
+export function fontStepBase({ chosen, shown, sizedByUser }) {
+  return sizedByUser ? chosen : Math.round(shown);
 }
 
 // Page turning in the reader (keyboard and Bluetooth page-turner pedals).

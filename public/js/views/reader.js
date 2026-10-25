@@ -1,7 +1,7 @@
 import { $app, api, escapeHtml, h } from '../app.js';
 import { icon } from '../icons.js';
 import {
-  renderBody, fitChars, pageStep, pageKeyDirection, uniqueChords, transposeChord,
+  renderBody, fitChars, readerLayout, fontStepBase, pageStep, pageKeyDirection, uniqueChords, transposeChord,
 } from '../chords.js';
 import {
   addToCollectionDialog, openSheet, versionPickerDialog,
@@ -27,8 +27,7 @@ const speedToLevel = (px) =>
   Math.min(MAX_LEVEL, Math.max(MIN_LEVEL, Math.round(px / PX_PER_LEVEL)));
 
 // Floor for the fit-to-width shrink. Text below this is not readable at
-// arm's length on a music stand, so the fit stops here and the few lines that
-// still overflow scroll sideways instead of shrinking the whole song.
+// arm's length on a music stand, so past it the song reflows instead.
 const MIN_FIT_FONT = 11;
 const MIN_FONT = 9;
 const MAX_FONT = 24;
@@ -73,6 +72,9 @@ export async function readerView([id]) {
   // always keeps the original monospace layout, shrinking as before.
   let reflowPref = localStorage.getItem('opentabs.reflow') === 'off' ? 'off' : 'auto';
   let reflowing = false;
+  // Set by A- / A+: from then on this song is drawn at exactly fontSize
+  // (chords.js, readerLayout).
+  let sizedByUser = false;
   // Characters that fit on one line at the current font: long staves are cut
   // into pieces this wide (chords.js, wrapStave). Infinity until measured.
   let staveCols = Infinity;
@@ -83,8 +85,8 @@ export async function readerView([id]) {
   let raf = null;
   let dirty = false;
 
-  // Width the font is fitted to, in characters: ignores tab staves (they get
-  // their own horizontal scroll) and tolerates the odd over-long line.
+  // Width the font is fitted to, in characters: the widest line that is not
+  // tablature (staves are cut to the screen on their own).
   const bodyText = (song.body || '').replace(/\s+$/, '');
   const fitTarget = fitChars(bodyText);
 
@@ -225,18 +227,18 @@ export async function readerView([id]) {
 
   // Reflow is a rescue, not a style: a song that fits at a readable size keeps
   // its original monospace alignment, which is what a guitarist recognizes.
-  // Only when fitting would push the text below MIN_FIT_FONT is the chord and
-  // lyric pairing worth the extra vertical length it costs.
-  function wantsReflow() {
-    if (reflowPref === 'off') return false;
-    return fittedFont() < MIN_FIT_FONT;
+  // Only when fitting would push the text below MIN_FIT_FONT, or the user
+  // asked for a size the plain layout cannot fit, is the chord and lyric
+  // pairing worth the extra vertical length it costs.
+  function layout() {
+    return readerLayout({
+      chosen: fontSize, fitted: fittedFont(), sizedByUser, reflowPref, minFit: MIN_FIT_FONT,
+    });
   }
 
-  function fitWidth() {
-    // A reflowed song fits by construction, so it keeps the chosen size.
-    if (reflowing) { $body.style.fontSize = fontSize + 'px'; return; }
-    $body.style.fontSize = Math.max(MIN_FIT_FONT, fittedFont()) + 'px';
-  }
+  // Size actually on screen, which is what the sheet shows: the remembered
+  // size is often not it, because untouched songs shrink to fit.
+  const shownFont = () => parseFloat($body.style.fontSize) || fontSize;
 
   function computeEndLimit() {
     const cs = getComputedStyle($body);
@@ -274,19 +276,19 @@ export async function readerView([id]) {
       if (el) el.textContent = text;
     };
     set('tr-val', transposeLabel(transpose));
-    set('fs-val', bracket(fontSize));
+    set('fs-val', bracket(Math.round(shownFont())));
     set('sp-val', bracket(level));
     const slider = document.getElementById('sheet-speed');
     if (slider && slider !== document.activeElement) slider.value = String(level);
   }
 
   function relayout() {
-    const want = wantsReflow();
-    if (want !== reflowing) {
-      reflowing = want;
+    const { reflow, font } = layout();
+    if (reflow !== reflowing) {
+      reflowing = reflow;
       render(); // the two layouts are different HTML, not just different CSS
     }
-    fitWidth();
+    $body.style.fontSize = font + 'px';
     // The fitted font decides how many characters a stave piece can hold.
     const cs = getComputedStyle($body);
     const avail = $body.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
@@ -297,6 +299,7 @@ export async function readerView([id]) {
     }
     computeEndLimit();
     updateProgress();
+    syncMeta(); // the size on screen may have changed with the layout
   }
 
   render();
@@ -334,8 +337,10 @@ export async function readerView([id]) {
     relayout();
   }
 
-  function setFont(n) {
-    fontSize = Math.min(MAX_FONT, Math.max(MIN_FONT, n));
+  function stepFont(delta) {
+    const base = fontStepBase({ chosen: fontSize, shown: shownFont(), sizedByUser });
+    sizedByUser = true;
+    fontSize = Math.min(MAX_FONT, Math.max(MIN_FONT, base + delta));
     localStorage.setItem('opentabs.fontSize', String(fontSize));
     relayout();
     syncMeta();
@@ -468,8 +473,8 @@ export async function readerView([id]) {
       render();
       relayout();
     };
-    el.querySelector('#fs-down').onclick = () => setFont(fontSize - 1);
-    el.querySelector('#fs-up').onclick = () => setFont(fontSize + 1);
+    el.querySelector('#fs-down').onclick = () => stepFont(-1);
+    el.querySelector('#fs-up').onclick = () => stepFont(1);
     el.querySelector('#sheet-speed').oninput = (e) => {
       setLevel(Number(e.target.value));
       $dur.value = formatDuration(totalSeconds());

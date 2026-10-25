@@ -6,7 +6,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   isChordToken, isChordLine, isTabLine, parseChord, transposeChord, renderBody, wrapStave,
-  fitChars, detectKind, pageStep, pageKeyDirection, uniqueChords,
+  fitChars, readerLayout, fontStepBase, detectKind, pageStep, pageKeyDirection, uniqueChords,
 } from '../public/js/chords.js';
 
 test('isChordToken accepts real chords', () => {
@@ -119,7 +119,7 @@ test('renderBody keeps separate staves in separate blocks', () => {
   assert.equal(out.match(/class="tabblock"/g).length, 2);
 });
 
-test('fitChars ignores tab staves and tolerates a lone long line', () => {
+test('fitChars ignores tab staves and fits the widest line', () => {
   const body = [
     'C     G',
     'short lyric line',
@@ -128,10 +128,38 @@ test('fitChars ignores tab staves and tolerates a lone long line', () => {
   ].join('\n');
   assert.ok(fitChars(body) < 40, 'staves must not drive the fitted width');
 
-  // A single outlier among many normal lines is left to scroll sideways
-  // rather than shrinking every other line to fit it.
-  const withOutlier = [...Array(20).fill('a normal lyric line'), 'x'.repeat(300)].join('\n');
-  assert.equal(fitChars(withOutlier), 'a normal lyric line'.length);
+  // Even a lone long line counts: left out, it dragged the whole song
+  // sideways on a phone (Bajan, a 55-column chord line among 30-column ones).
+  // Too wide to fit at a readable size, the song reflows instead.
+  const withOutlier = [...Array(20).fill('a normal lyric line'), 'x'.repeat(55)].join('\n');
+  assert.equal(fitChars(withOutlier), 55);
+});
+
+test('readerLayout: an untouched song shrinks to fit, then reflows', () => {
+  assert.deepEqual(readerLayout({ chosen: 14, fitted: 14 }), { reflow: false, font: 14 });
+  assert.deepEqual(readerLayout({ chosen: 14, fitted: 12.5 }), { reflow: false, font: 12.5 });
+  // Below the readable floor it wraps at the chosen size rather than scroll.
+  assert.deepEqual(readerLayout({ chosen: 14, fitted: 9 }), { reflow: true, font: 14 });
+});
+
+test('readerLayout: A+ on a fitted song makes the text bigger', () => {
+  // The bug: a song shrunk to 11.5px ignored A+, since every bigger size
+  // shrank back to the same 11.5px. Picked by the user, the size is honoured
+  // and the song wraps to make room.
+  const picked = readerLayout({ chosen: 13, fitted: 11.5, sizedByUser: true });
+  assert.deepEqual(picked, { reflow: true, font: 13 });
+  // A smaller pick that fits keeps the original columns.
+  assert.deepEqual(readerLayout({ chosen: 11, fitted: 11, sizedByUser: true }), { reflow: false, font: 11 });
+});
+
+test('readerLayout: "Wrap long lines: Off" never reflows', () => {
+  assert.deepEqual(readerLayout({ chosen: 14, fitted: 9, reflowPref: 'off' }), { reflow: false, font: 11 });
+  assert.deepEqual(readerLayout({ chosen: 16, fitted: 9, reflowPref: 'off', sizedByUser: true }), { reflow: false, font: 16 });
+});
+
+test('fontStepBase: the first tap steps from the size on screen', () => {
+  assert.equal(fontStepBase({ chosen: 14, shown: 11.54, sizedByUser: false }), 12);
+  assert.equal(fontStepBase({ chosen: 13, shown: 13, sizedByUser: true }), 13);
 });
 
 test('detectKind separates tab arrangements from chord sheets and lyrics', () => {

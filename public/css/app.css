@@ -269,8 +269,8 @@ select.btn, select.btn:hover {
   font: 14px/1.45 var(--mono);
   white-space: pre; overflow-x: auto;
   margin: 0;
-  /* El ancho se ajusta en JS (reader.js); overflow-x es solo el último
-     recurso. Arriba ya no hay hueco: la cabecera de la canción va encima. */
+  /* El ancho se ajusta en JS (reader.js); overflow-x solo actúa con
+     «Wrap long lines: Off». Arriba ya no hay hueco: la cabecera de la canción va encima. */
   padding: var(--s3) var(--s4) var(--s2);
   touch-action: manipulation; /* sin zoom de doble toque en iOS; el doble toque alterna el autoscroll */
 }

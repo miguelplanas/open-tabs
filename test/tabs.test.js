@@ -52,5 +52,5 @@ test('the top bar clears the iOS blur under the status bar', () => {
   // starts right at the safe area has its title and buttons half blurred.
   const css = readFileSync(new URL('../public/css/app.css', import.meta.url), 'utf8');
   const rule = css.match(/\n\.topbar \{([^}]*)\}/)[1];
-  assert.match(rule, /padding:\s*calc\(var\(--s2\) \+ var\(--safe-top\) \+ min\(var\(--safe-top\), 36px\)\)/);
+  assert.match(rule, /padding:\s*calc\(var\(--s2\) \+ var\(--safe-top\) \+ min\(var\(--safe-top\), var\(--s3\)\)\)/);
 });

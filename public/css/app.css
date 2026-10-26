@@ -57,8 +57,9 @@ code { font-family: var(--mono); font-size: 0.9em; }
   display: flex; align-items: center; gap: var(--s2); flex-wrap: wrap;
   /* El margen de más bajo la barra de estado (solo si la hay) saca el
      título y los botones del difuminado que iOS 26+ pone en lo alto de la
-     pantalla: pegados a la barra quedaban medio borrosos. */
-  padding: calc(var(--s2) + var(--safe-top) + min(var(--safe-top), var(--s3))) var(--s4) var(--s2);
+     pantalla: pegados a la barra quedaban medio borrosos. Medido en un
+     iPhone, el difuminado llega ~33 pt por debajo de la zona segura. */
+  padding: calc(var(--s2) + var(--safe-top) + min(var(--safe-top), 36px)) var(--s4) var(--s2);
   background: var(--glass);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);

@@ -2,6 +2,7 @@ import { $app, api, h, escapeHtml } from '../app.js';
 import { icon } from '../icons.js';
 import { promptDialog, confirmDialog, toast, onLongPress, songActionsSheet, openOverlay } from '../ui.js';
 import { visibleDescription } from '../collection-text.js';
+import { swapSongsById } from '../setlist.js';
 
 const SETLIST_KEY = 'opentabs.setlist';
 
@@ -131,13 +132,18 @@ export async function collectionView([id]) {
     }
     const j = act === 'up' ? i - 1 : i + 1;
     if (j < 0 || j >= col.songs.length) return;
-    [col.songs[i], col.songs[j]] = [col.songs[j], col.songs[i]];
+    const a = col.songs[i].id;
+    const b = col.songs[j].id;
+    col.songs = swapSongsById(col.songs, a, b);
     renderList();
     try {
       await api(`/collections/${col.id}/songs`, {
         method: 'PUT', body: { order: col.songs.map((s) => s.id) },
       });
     } catch (err) {
+      // Put it back: the screen must not show an order the server doesn't have.
+      col.songs = swapSongsById(col.songs, a, b);
+      renderList();
       if (err.message !== 'unauthorized') toast('Reorder failed: ' + err.message, { danger: true });
     }
   }

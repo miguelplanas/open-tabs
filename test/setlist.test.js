@@ -25,3 +25,10 @@ test('a song outside the setlist, or no setlist, changes nothing', () => {
   assert.equal(swapSetlistSong(setlist, 99, 21), setlist);
   assert.equal(swapSetlistSong(null, 20, 21), null);
 });
+
+test('swapSongsById undoes a move by id, leaving the rest alone', async () => {
+  const { swapSongsById } = await import('../public/js/setlist.js');
+  const songs = [{ id: 1 }, { id: 2 }, { id: 3 }];
+  assert.deepEqual(swapSongsById(songs, 1, 3).map((s) => s.id), [3, 2, 1]);
+  assert.deepEqual(swapSongsById(songs, 1, 9), songs);
+});

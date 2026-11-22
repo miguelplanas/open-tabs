@@ -48,10 +48,10 @@ export async function searchView([params] = []) {
     sourcesList = await api('/sources');
   } catch (err) {
     if (err.message === 'unauthorized') return;
-    if (!navigator.onLine) {
-      $results.innerHTML = `<li class="empty">${OFFLINE}</li>`;
-      return;
-    }
+    // Any failure, not only !navigator.onLine: with the VPN up but the server
+    // unreachable the phone still says it is online.
+    $results.innerHTML = `<li class="empty">${OFFLINE}</li>`;
+    return;
   }
   if (sourcesList.length === 0) {
     $results.innerHTML = `<li class="empty">No tab sources configured.<br>

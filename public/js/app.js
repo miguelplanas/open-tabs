@@ -10,17 +10,24 @@ import { loginView } from './views/login.js';
 import { createNav } from './nav.js';
 import { closeAllOverlays } from './ui.js';
 import { planWarm, nextManifest } from './offline.js';
+import { friendlyError, REQUEST_TIMEOUT_MS } from './net.js';
 import { TABS, tabForHash } from './tabs.js';
 import { icon } from './icons.js';
 
 export const $app = document.getElementById('app');
 
 export async function api(path, opts = {}) {
-  const res = await fetch('/api' + path, {
-    headers: { 'Content-Type': 'application/json' },
-    ...opts,
-    body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
-  });
+  let res;
+  try {
+    res = await fetch('/api' + path, {
+      headers: { 'Content-Type': 'application/json' },
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+      ...opts,
+      body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
+    });
+  } catch (err) {
+    throw new Error(friendlyError(err));
+  }
   if (res.status === 401) {
     location.hash = '#/login';
     throw new Error('unauthorized');
@@ -147,6 +154,9 @@ route();
 
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('/sw.js').catch(() => {});
+  // Ask the browser to keep the offline copy instead of evicting it when the
+  // device runs short of space. Best-effort: iOS may still say no.
+  navigator.storage?.persist?.().catch(() => {});
 }
 
 // Offline cache warmer: the service worker only caches songs and collections

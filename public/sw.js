@@ -26,7 +26,8 @@ const SHELL = [
   '/js/views/library.js', '/js/views/reader.js', '/js/views/editor.js',
   '/js/views/search.js', '/js/views/preview.js', '/js/views/login.js',
   '/js/views/collections.js', '/js/views/collection.js',
-  '/icons/icon.svg?v=2',
+  '/icons/icon.svg?v=2', '/icons/icon-180.png?v=2', '/icons/icon-192.png?v=2', '/icons/icon-512.png?v=2',
+  '/js/net.js',
 ];
 
 self.addEventListener('install', (e) => {
@@ -73,17 +74,24 @@ self.addEventListener('fetch', (e) => {
         }
         return res;
       });
+      // A server error (Traefik's 502 while the app restarts after a deploy)
+      // is no better than no answer when a saved copy exists.
+      const usable = network.then((res) => {
+        if (res.status >= 500 && cached) throw new Error('server error');
+        return res;
+      });
       try {
-        if (!cached) return await network;
+        // With a saved copy the network gets a short head start; without one
+        // it gets longer, but not the minute a hung connection takes.
         return await Promise.race([
-          network,
-          new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 3500)),
+          usable,
+          new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), cached ? 3500 : 10000)),
         ]);
       } catch {
         network.catch(() => {}); // may still settle after losing the race
         // respondWith(undefined) is a hard SW error ("response is null" on
         // iOS), so cache misses become an explicit 503 the app can show.
-        return cached || new Response(JSON.stringify({ error: 'Offline and not cached' }), {
+        return cached || new Response(JSON.stringify({ error: 'No connection, and this hasn’t been saved on this device yet' }), {
           status: 503,
           headers: { 'Content-Type': 'application/json' },
         });

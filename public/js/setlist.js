@@ -20,3 +20,15 @@ export function swapSetlistSong(setlist, fromId, toId) {
   if (titles) [titles[i], titles[j]] = [titles[j], titles[i]];
   return { ...setlist, ids, titles };
 }
+
+// Swap two songs of a collection by id, wherever they are now. Used to undo a
+// reorder the server refused (no signal): by id rather than by position, so
+// a second move made while the first was in flight stays put.
+export function swapSongsById(songs, a, b) {
+  const i = songs.findIndex((s) => s.id === a);
+  const j = songs.findIndex((s) => s.id === b);
+  if (i < 0 || j < 0) return songs;
+  const out = songs.slice();
+  [out[i], out[j]] = [out[j], out[i]];
+  return out;
+}

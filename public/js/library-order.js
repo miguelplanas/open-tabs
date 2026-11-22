@@ -101,3 +101,17 @@ export function compactLetters(slots) {
   }
   return out;
 }
+
+// Library filter, run on the device over the full /api/songs list. It used to
+// be a ?q= request per keystroke, which the service worker never caches, so
+// with no signal the search box only said "Offline and not cached". Same rule
+// as the server's norm(): case and accents ignored, substring of the title or
+// the artist. Server order (recent first) is kept.
+const fold = (s) =>
+  typeof s === 'string' ? s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase() : '';
+
+export function filterSongs(songs, q) {
+  const needle = fold(q.trim());
+  if (!needle) return songs;
+  return songs.filter((s) => fold(s.title).includes(needle) || fold(s.artist).includes(needle));
+}

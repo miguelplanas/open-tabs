@@ -6,7 +6,7 @@ import {
 import { onlineSearchHash } from '../search-route.js';
 import {
   ORDERS, readOrder, sectionsByLetter, sectionsByArtist, letterAt, nearestPresent,
-  compactLetters,
+  compactLetters, filterSongs,
 } from '../library-order.js';
 import { loadJson, saveJson, LIBRARY_QUERY_KEY } from '../view-state.js';
 
@@ -82,10 +82,10 @@ export async function libraryView() {
     // entry. Sorting and artist grouping act on each group's representative,
     // which is the version the server put first, so the most recently played
     // or edited one speaks for the group.
-    const groups = groupVersions(all);
+    const q = $q.value.trim();
+    const groups = groupVersions(filterSongs(all, q));
     $az.hidden = true;
 
-    const q = $q.value.trim();
     if (groups.length === 0) {
       $list.innerHTML = `<li class="empty"><div class="strings"></div>${
         q ? 'No songs match.' : 'Your library is empty.<br>Add a song, or search online to import one.'
@@ -178,10 +178,9 @@ export async function libraryView() {
   }, 150);
   window.addEventListener('resize', onResize);
 
-  // Songs, not rows: a song with three versions counts once. Only meaningful
-  // over the whole library, so a filtered list leaves the header alone.
+  // Songs, not rows: a song with three versions counts once, over the whole
+  // library whatever the filter shows.
   function renderCount() {
-    if ($q.value.trim()) return;
     const n = groupVersions(all).length;
     document.getElementById('count').textContent =
       n > 0 ? `[${n}]` : '';
@@ -195,28 +194,24 @@ export async function libraryView() {
     render();
   }
 
-  let gen = 0;
+  // The whole list once; the search box filters it on the device, so it
+  // works offline and doesn't hit the server on every keystroke.
   async function load() {
-    const my = ++gen;
     try {
-      // No query: hit the canonical /songs URL, which the service worker
-      // caches for offline. ?q= URLs are deliberately never cached.
-      const q = $q.value.trim();
-      all = await api(q ? '/songs?q=' + encodeURIComponent(q) : '/songs');
-      if (my !== gen) return; // a newer search superseded this response
+      all = await api('/songs');
       renderCount();
       render();
     } catch (err) {
-      if (my === gen && err.message !== 'unauthorized') {
+      if (err.message !== 'unauthorized') {
         $list.innerHTML = `<li class="empty error">${escapeHtml(err.message)}</li>`;
       }
     }
   }
 
-  const debouncedLoad = debounce(load, 200);
+  const debouncedRender = debounce(render, 80);
   $q.addEventListener('input', () => {
     saveJson(sessionStorage, LIBRARY_QUERY_KEY, $q.value.trim());
-    debouncedLoad();
+    debouncedRender();
   });
   $order.onclick = (e) => {
     const b = e.target.closest('.segment');
@@ -229,7 +224,7 @@ export async function libraryView() {
   await load();
 
   return () => {
-    debouncedLoad.cancel();
+    debouncedRender.cancel();
     onResize.cancel();
     window.removeEventListener('resize', onResize);
   };

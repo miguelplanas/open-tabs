@@ -84,3 +84,19 @@ test('the service worker precaches library-order.js', () => {
   const sw = readFileSync(new URL('../public/sw.js', import.meta.url), 'utf8');
   assert.match(sw, /'\/js\/library-order\.js'/);
 });
+
+test('filterSongs matches title or artist ignoring case and accents, keeping order', async () => {
+  const { filterSongs } = await import('../public/js/library-order.js');
+  const songs = [
+    { id: 1, title: 'Al otro lado del río', artist: 'Jorge Drexler' },
+    { id: 2, title: 'Todo se transforma', artist: 'Jorge Drexler' },
+    { id: 3, title: 'Wonderwall', artist: 'Oasis' },
+    { id: 4, title: 'Sin artista', artist: null },
+  ];
+  assert.deepEqual(filterSongs(songs, 'drexler').map((s) => s.id), [1, 2]);
+  assert.deepEqual(filterSongs(songs, '  RIO ').map((s) => s.id), [1]);
+  assert.deepEqual(filterSongs(songs, 'río').map((s) => s.id), [1]);
+  assert.deepEqual(filterSongs(songs, 'wall').map((s) => s.id), [3]);
+  assert.deepEqual(filterSongs(songs, 'zzz'), []);
+  assert.equal(filterSongs(songs, '   '), songs);
+});

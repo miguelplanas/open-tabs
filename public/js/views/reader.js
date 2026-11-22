@@ -1,4 +1,5 @@
-import { $app, api, escapeHtml, h } from '../app.js';
+import { $app, api, escapeHtml, h, sendSettings } from '../app.js';
+import { queueSettings, pendingFor, withPending } from '../reader-settings.js';
 import { icon } from '../icons.js';
 import {
   renderBody, fitChars, readerLayout, fontStepBase, pageStep, pageKeyDirection, uniqueChords, transposeChord,
@@ -49,7 +50,7 @@ const COUNTDOWN_S = 3;
 export async function readerView([id]) {
   let song;
   try {
-    song = await api('/songs/' + id);
+    song = withPending(await api('/songs/' + id), pendingFor(localStorage, id));
   } catch (err) {
     if (err.message === 'unauthorized') return;
     $app.innerHTML = `<div class="empty error">${escapeHtml(err.message)}</div>`;
@@ -669,18 +670,19 @@ export async function readerView([id]) {
 
   // Flush settings even when the PWA is swiped away or the page discarded:
   // teardown never runs then, but pagehide does, and sendBeacon survives it.
-  function flushSettings() {
+  // Every change is queued on the device first (reader-settings.js), so one
+  // made with no signal is resent later instead of lost.
+  function flushSettings(leaving) {
     if (!dirty) return;
     dirty = false;
-    const url = `/api/songs/${id}/played`;
-    const payload = JSON.stringify({ scroll_speed: speed, transpose });
-    if (navigator.sendBeacon) {
-      navigator.sendBeacon(url, new Blob([payload], { type: 'application/json' }));
+    const sent = { scroll_speed: speed, transpose };
+    queueSettings(localStorage, id, sent);
+    if (leaving && navigator.sendBeacon) {
+      // The page may be gone before a fetch answers; the beacon survives it,
+      // and the queued entry is resent on the next start in case it didn't.
+      navigator.sendBeacon(`/api/songs/${id}/played`, new Blob([JSON.stringify(sent)], { type: 'application/json' }));
     } else {
-      api(`/songs/${id}/played`, {
-        method: 'POST',
-        body: { scroll_speed: speed, transpose },
-      }).catch(() => {});
+      sendSettings(id, sent);
     }
   }
 
@@ -688,11 +690,12 @@ export async function readerView([id]) {
     if (document.visibilityState === 'visible') keepAwake();
     if (document.visibilityState === 'hidden') {
       last = 0; // don't count hidden time toward autoscroll
-      flushSettings();
+      flushSettings(true);
     }
   };
   document.addEventListener('visibilitychange', onVis);
-  window.addEventListener('pagehide', flushSettings);
+  const onPageHide = () => flushSettings(true);
+  window.addEventListener('pagehide', onPageHide);
 
   keepAwake();
 
@@ -706,12 +709,12 @@ export async function readerView([id]) {
     document.removeEventListener('keydown', onKey);
     document.removeEventListener('pointerdown', onPoke);
     document.removeEventListener('visibilitychange', onVis);
-    window.removeEventListener('pagehide', flushSettings);
+    window.removeEventListener('pagehide', onPageHide);
     if (raf) cancelAnimationFrame(raf);
     clearTimeout(wakeIdle);
     clearInterval(counting);
     clearTimeout(dimT);
     releaseWake();
-    flushSettings();
+    flushSettings(false);
   };
 }

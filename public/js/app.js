@@ -11,6 +11,7 @@ import { createNav } from './nav.js';
 import { closeAllOverlays } from './ui.js';
 import { planWarm, nextManifest } from './offline.js';
 import { friendlyError, REQUEST_TIMEOUT_MS } from './net.js';
+import { allPending, settleSettings } from './reader-settings.js';
 import { TABS, tabForHash } from './tabs.js';
 import { icon } from './icons.js';
 
@@ -212,5 +213,38 @@ async function warmOfflineCache() {
     warmed = false; // retry on the next load
   }
 }
+// Reader settings queued on the device (reader-settings.js). Delivered ones
+// are also written into the saved offline copy of the song: the setting
+// doesn't change updated_at, so the warmer would never refetch it.
+export async function sendSettings(id, sent) {
+  try {
+    await api(`/songs/${id}/played`, { method: 'POST', body: sent });
+  } catch {
+    return; // still queued; resent on the next start or when back online
+  }
+  settleSettings(localStorage, id, sent);
+  try {
+    const cache = await caches.open(API_CACHE);
+    const url = `/api/songs/${id}`;
+    const res = await cache.match(url);
+    if (res) {
+      const song = await res.json();
+      await cache.put(url, new Response(JSON.stringify({ ...song, ...sent }), {
+        headers: { 'Content-Type': 'application/json' },
+      }));
+    }
+  } catch { /* no Cache Storage: the next fetch of the song brings it */ }
+}
+
+function syncPendingSettings() {
+  for (const { id, scroll_speed, transpose } of allPending(localStorage)) {
+    sendSettings(id, { scroll_speed, transpose });
+  }
+}
+window.addEventListener('online', syncPendingSettings);
+
 const whenIdle = window.requestIdleCallback || ((fn) => setTimeout(fn, 2500));
-whenIdle(() => warmOfflineCache());
+whenIdle(() => {
+  syncPendingSettings();
+  warmOfflineCache();
+});

@@ -4,22 +4,29 @@ import { renderBody } from '../chords.js';
 import { toast, confirmDialog } from '../ui.js';
 import { oneAtATime } from '../busy.js';
 
+const IMPORT_KEY = 'opentabs.import';
+const EDIT_OFFLINE = 'Editing needs a connection to the server, so an old copy can’t overwrite newer changes.';
+
 // Handles #/new (no id), #/edit/:id, and imports handed over from the
 // online search view via sessionStorage.
 export async function editorView([id]) {
   let song = { title: '', artist: '', body: '', capo: 0, tuning: '' };
   if (id) {
+    // Never the saved offline copy: it may predate an edit made elsewhere,
+    // and Save would overwrite that edit with it. The query string makes the
+    // service worker skip its cache (it only stores and matches bare URLs).
     try {
-      song = await api('/songs/' + id);
+      song = await api(`/songs/${id}?edit=1`);
     } catch (err) {
       if (err.message === 'unauthorized') return;
-      $app.innerHTML = `<div class="empty error">${escapeHtml(err.message)}</div>`;
+      $app.innerHTML = `<div class="empty error">${escapeHtml(EDIT_OFFLINE)}</div>`;
       return;
     }
   } else {
-    const draft = sessionStorage.getItem('opentabs.import');
+    // The import stays in sessionStorage until it is saved: a Save that fails
+    // with no signal used to lose it.
+    const draft = sessionStorage.getItem(IMPORT_KEY);
     if (draft) {
-      sessionStorage.removeItem('opentabs.import');
       try { song = { ...song, ...JSON.parse(draft) }; } catch { /* ignore bad draft */ }
     }
   }
@@ -63,8 +70,10 @@ export async function editorView([id]) {
   const $preview = document.getElementById('preview');
   const $ta = $form.elements.body;
 
-  document.getElementById('back').onclick = () =>
-    (location.hash = id ? '#/song/' + id : '#/');
+  document.getElementById('back').onclick = () => {
+    if (!id) sessionStorage.removeItem(IMPORT_KEY); // backing out discards it
+    location.hash = id ? '#/song/' + id : '#/';
+  };
 
   document.getElementById('preview-toggle').onclick = () => {
     const showing = !$preview.hidden;
@@ -85,6 +94,7 @@ export async function editorView([id]) {
       ? await api('/songs/' + id, { method: 'PUT', body: data })
       : await api('/songs', { method: 'POST', body: data });
     warmSong(saved.id); // refresh the offline copy
+    if (!id) sessionStorage.removeItem(IMPORT_KEY);
     location.hash = '#/song/' + saved.id;
   });
 
@@ -111,6 +121,7 @@ export async function editorView([id]) {
         await api('/songs/' + id, { method: 'DELETE' });
         location.hash = '#/';
       } catch (err) {
+        if (err.message === 'unauthorized') return;
         toast('Delete failed: ' + err.message, { danger: true });
       }
     };

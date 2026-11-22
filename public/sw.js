@@ -48,11 +48,14 @@ self.addEventListener('activate', (e) => {
   );
 });
 
+// Bare URLs only: a query string (the editor's ?edit=1) is a request for the
+// server's copy, never stored, so it never shadows the canonical entry.
 const cacheableApi = (url) =>
-  (url.pathname === '/api/songs' && !url.search) ||
-  /^\/api\/songs\/\d+$/.test(url.pathname) ||
-  (url.pathname === '/api/collections' && !url.search) ||
-  /^\/api\/collections\/\d+$/.test(url.pathname);
+  !url.search && (
+    url.pathname === '/api/songs' ||
+    /^\/api\/songs\/\d+$/.test(url.pathname) ||
+    url.pathname === '/api/collections' ||
+    /^\/api\/collections\/\d+$/.test(url.pathname));
 
 self.addEventListener('fetch', (e) => {
   const url = new URL(e.request.url);
